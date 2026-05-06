@@ -1,0 +1,34 @@
+plugins:
+  - name: request-transformer
+    route: pms-internal-route
+    config:
+      add:
+        headers:
+          - X-Gateway-Layer:internal
+  - name: key-auth
+    route: pms-bff-route
+    config:
+      key_names: [x-api-key]
+      hide_credentials: false
+  - name: rate-limiting
+    route: pms-bff-route
+    config:
+      minute: 120
+      policy: local
+  - name: request-transformer
+    route: pms-bff-route
+    config:
+      add:
+        headers:
+          - X-Gateway-Layer:bff
+  - name: rate-limiting
+    route: pms-openapi-route
+    config:
+      minute: 30
+      policy: local
+  - name: request-transformer
+    route: pms-openapi-route
+    config:
+      add:
+        headers:
+          - X-Gateway-Layer:openapi

@@ -1,0 +1,91 @@
+[project]
+name = "pms-ai-selection"
+version = "0.1.0"
+description = "AI选品系统 - 跨境电商智能产品选择平台"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "PMS Team", email = "dev@pms.com"}
+]
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "sqlalchemy>=2.0.36",
+    "asyncpg>=0.30.0",
+    "redis>=5.2.0",
+    "httpx>=0.28.0",
+    "aiosmtplib>=3.0.2",
+    "authlib>=1.7.0",
+    "itsdangerous>=2.2.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.18",
+    "alembic>=1.14.0",
+    "loguru>=0.7.3",
+    "kubernetes>=31.0.0",
+    "pyyaml>=6.0.2",
+    "jinja2>=3.1.4",
+    "rich>=13.9.0",
+    "qdrant-client>=1.17.0",
+    "neo4j>=5.28.0",
+    "aiokafka>=0.10.0",
+    "numpy>=1.26.0",
+    "elasticsearch>=8.15.0",
+    "opensearch-py>=2.7.1",
+    "prometheus-client>=0.21.0",
+    "prometheus-fastapi-instrumentator>=7.0.0",
+    "celery[redis]>=5.4.0",
+    "langchain>=0.3.0",
+    "llama-index>=0.12.0",
+    "ray>=2.40.0",
+    "Pillow>=10.4.0",
+    "scrapy>=2.15.0",
+    "playwright>=1.55.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "httpx>=0.28.0",
+    "factory-boy>=3.3.1",
+]
+local-ai = [
+    "sentence-transformers>=3.3.0",
+    "faster-whisper>=1.1.0",
+]
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+# B008 is noisy for FastAPI Depends defaults; B904 is tracked as a separate exception-chain cleanup.
+ignore = ["E501", "B008", "B904"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true

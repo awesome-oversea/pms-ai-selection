@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🎯 AI选品系统</div>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/selection" class="active">选品任务</a>
+            <a href="/approval">审批管理</a>
+            <a href="/agents/monitor">Agent监控</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>🎯 选品任务面板</h1>
+            <p class="subtitle">创建和管理AI驱动的产品选择分析任务</p>
+            {% if nextjs_entry %}
+            <p class="text-muted">正式入口已迁移至 <a href="{{ nextjs_entry }}">{{ nextjs_entry }}</a>，当前页面作为 legacy 兼容保留。</p>
+            {% endif %}
+        </div>
+
+        <section class="card task-form-card">
+            <h2>➕ 创建新任务</h2>
+            <form id="taskForm" class="task-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="query">产品关键词 *</label>
+                        <input type="text" id="query" name="query" required
+                               placeholder="例如: 蓝牙耳机、智能手表、充电宝"
+                               minlength="2" maxlength="500">
+                        <small>输入您想要分析的产品或市场关键词</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="category">产品类目</label>
+                        <select id="category" name="category">
+                            <option value="electronics">电子产品</option>
+                            <option value="wearables">可穿戴设备</option>
+                            <option value="home_garden">家居园艺</option>
+                            <option value="beauty">美妆个护</option>
+                            <option value="sports">运动户外</option>
+                            <option value="toys">玩具游戏</option>
+                            <option value="other">其他</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="budget">投资预算 (USD)</label>
+                        <input type="number" id="budget" name="investment_budget"
+                               placeholder="50000" min="0" step="1000" value="50000">
+                        <small>预计的产品开发和推广预算</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="market">目标市场</label>
+                        <select id="market" name="target_market">
+                            <option value="US">美国 (US)</option>
+                            <option value="EU">欧洲 (EU)</option>
+                            <option value="UK">英国 (UK)</option>
+                            <option value="JP">日本 (JP)</option>
+                            <option value="SEA">东南亚 (SEA)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group form-group-full">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="autoApprove" name="auto_approve">
+                            <span>自动审批模式 (高分结果自动通过)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                        🚀 启动选品分析
+                    </button>
+                </div>
+            </form>
+
+            <div id="submitResult" class="submit-result hidden"></div>
+        </section>
+
+        <section class="card tasks-list-card">
+            <div class="card-header-row">
+                <h2>📋 任务列表</h2>
+                <div class="filters">
+                    <select id="statusFilter" class="filter-select">
+                        <option value="">全部状态</option>
+                        <option value="running">运行中</option>
+                        <option value="completed">已完成</option>
+                        <option value="failed">失败</option>
+                        <option value="cancelled">已取消</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="tasksListContainer">
+                <table class="data-table" id="tasksTable">
+                    <thead>
+                        <tr>
+                            <th>任务ID</th>
+                            <th>查询内容</th>
+                            <th>类目</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tasksBody">
+                        <tr><td colspan="6" class="loading">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>AI选品系统 v1.0 &copy; 2024 | Powered by Multi-Agent Framework</p>
+    </footer>
+
+    <script src="/static/js/selection.js"></script>
+</body>
+</html>

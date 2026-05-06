@@ -1,0 +1,227 @@
+services:
+  redis-master:
+    image: redis:7.4-alpine
+    container_name: pms-redis-master-wsl
+    command:
+      - sh
+      - -c
+      - |
+          exec redis-server \
+            --port 6379 \
+            --appendonly yes \
+            --protected-mode no
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_master_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis-replica-1:
+    image: redis:7.4-alpine
+    container_name: pms-redis-replica-1-wsl
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+          exec redis-server \
+            --port 6379 \
+            --replicaof redis-master 6379 \
+            --appendonly yes \
+            --protected-mode no
+    ports:
+      - "16380:6379"
+    volumes:
+      - redis_replica_1_data:/data
+
+  redis-replica-2:
+    image: redis:7.4-alpine
+    container_name: pms-redis-replica-2-wsl
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+          exec redis-server \
+            --port 6379 \
+            --replicaof redis-master 6379 \
+            --appendonly yes \
+            --protected-mode no
+    ports:
+      - "16381:6379"
+    volumes:
+      - redis_replica_2_data:/data
+
+  redis-sentinel-1:
+    image: redis:7.4-alpine
+    container_name: pms-redis-sentinel-1-wsl
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+          MASTER_IP="$(ping -c 1 redis-master | sed -n '1s/.*(\(.*\)).*/\1/p')"
+          test -n "$$MASTER_IP"
+          cat >/tmp/sentinel.conf <<EOF
+          port 26379
+          dir /tmp
+          sentinel monitor mymaster $${MASTER_IP} 6379 2
+          sentinel down-after-milliseconds mymaster 5000
+          sentinel failover-timeout mymaster 60000
+          sentinel parallel-syncs mymaster 1
+          sentinel resolve-hostnames yes
+          sentinel announce-hostnames yes
+          EOF
+          exec redis-sentinel /tmp/sentinel.conf
+    ports:
+      - "26379:26379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "SENTINEL", "get-master-addr-by-name", "mymaster"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis-sentinel-2:
+    image: redis:7.4-alpine
+    container_name: pms-redis-sentinel-2-wsl
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+          MASTER_IP="$(ping -c 1 redis-master | sed -n '1s/.*(\(.*\)).*/\1/p')"
+          test -n "$$MASTER_IP"
+          cat >/tmp/sentinel.conf <<EOF
+          port 26379
+          dir /tmp
+          sentinel monitor mymaster $${MASTER_IP} 6379 2
+          sentinel down-after-milliseconds mymaster 5000
+          sentinel failover-timeout mymaster 60000
+          sentinel parallel-syncs mymaster 1
+          sentinel resolve-hostnames yes
+          sentinel announce-hostnames yes
+          EOF
+          exec redis-sentinel /tmp/sentinel.conf
+    ports:
+      - "26380:26379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "SENTINEL", "get-master-addr-by-name", "mymaster"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis-sentinel-3:
+    image: redis:7.4-alpine
+    container_name: pms-redis-sentinel-3-wsl
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+          MASTER_IP="$(ping -c 1 redis-master | sed -n '1s/.*(\(.*\)).*/\1/p')"
+          test -n "$$MASTER_IP"
+          cat >/tmp/sentinel.conf <<EOF
+          port 26379
+          dir /tmp
+          sentinel monitor mymaster $${MASTER_IP} 6379 2
+          sentinel down-after-milliseconds mymaster 5000
+          sentinel failover-timeout mymaster 60000
+          sentinel parallel-syncs mymaster 1
+          sentinel resolve-hostnames yes
+          sentinel announce-hostnames yes
+          EOF
+          exec redis-sentinel /tmp/sentinel.conf
+    ports:
+      - "26381:26379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "SENTINEL", "get-master-addr-by-name", "mymaster"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  keycloak-db:
+    image: postgres:16-alpine
+    container_name: pms-keycloak-db-wsl
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    ports:
+      - "15434:5432"
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: pms-keycloak-wsl
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    command:
+      - start-dev
+      - --import-realm
+      - --http-port=8080
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin123
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "18082:8080"
+      - "19000:9000"
+    volumes:
+      - ./docker/keycloak/pms-dev-realm.json:/opt/keycloak/data/import/pms-dev-realm.json:ro
+
+  flink-jobmanager:
+    image: flink:2.2.0-scala_2.12
+    container_name: pms-flink-jobmanager-wsl
+    command: jobmanager
+    ports:
+      - "18081:8081"
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.memory.process.size: 1024m
+        taskmanager.numberOfTaskSlots: 2
+
+  flink-taskmanager:
+    image: flink:2.2.0-scala_2.12
+    container_name: pms-flink-taskmanager-wsl
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.memory.process.size: 1024m
+        taskmanager.numberOfTaskSlots: 2
+
+volumes:
+  redis_master_data:
+  redis_replica_1_data:
+  redis_replica_2_data:
+  keycloak_db_data:

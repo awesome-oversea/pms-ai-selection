@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: triton-embedding
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: triton-embedding
+  template:
+    metadata:
+      labels:
+        app: triton-embedding
+    spec:
+      containers:
+        - name: triton
+          image: nvcr.io/nvidia/tritonserver:23.10-py3
+          args:
+            - tritonserver
+            - --model-repository=/models
+          ports:
+            - containerPort: 8000
+              name: http
+            - containerPort: 8001
+              name: grpc
+            - containerPort: 8002
+              name: metrics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: triton-embedding
+spec:
+  selector:
+    app: triton-embedding
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

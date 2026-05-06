@@ -1,0 +1,59 @@
+# Shared-runtime values contract for converting the current FMS k8s manifests to Helm.
+
+global:
+  namespace: fms-system
+  sharedNamespace: shared-infra
+
+image:
+  repository: registry.example.com/fms/pms-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 3
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: pms.example.com
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2000m"
+    memory: "2Gi"
+
+env:
+  APP_ENVIRONMENT: production
+  APP_DEBUG: "false"
+  APP_LOG_LEVEL: INFO
+  APP_API_PREFIX: /api/v1
+  DB_URL: postgresql+asyncpg://pms:REPLACE_ME_DB_PASSWORD@postgres.shared-infra.svc.cluster.local:5432/pms_db
+  REDIS_URL: redis://redis.shared-infra.svc.cluster.local:6379/3
+  KAFKA_BOOTSTRAP_SERVERS: kafka.shared-infra.svc.cluster.local:9092
+  SEARCH_ENABLED: "true"
+  SEARCH_BACKEND: opensearch
+  SEARCH_ENDPOINT: http://opensearch.shared-infra.svc.cluster.local:9200
+  QDRANT_HOST: qdrant.shared-infra.svc.cluster.local
+  QDRANT_PORT: "6333"
+  NEO4J_ENABLED: "false"
+  NEO4J_URI: bolt://neo4j.shared-infra.svc.cluster.local:7687
+  LLM_OLLAMA_ENDPOINT: http://ollama.shared-infra.svc.cluster.local:11434
+  REPORT_CENTER_STATE_PATH: /app/artifacts/report_center/prod-state.json
+
+secretRefs:
+  - name: fms-shared-runtime-secrets
+
+sharedDependencies:
+  postgres: postgres.shared-infra.svc.cluster.local:5432
+  redis: redis.shared-infra.svc.cluster.local:6379
+  kafka: kafka.shared-infra.svc.cluster.local:9092
+  opensearch: http://opensearch.shared-infra.svc.cluster.local:9200
+  qdrant: qdrant.shared-infra.svc.cluster.local:6333
+  neo4j: bolt://neo4j.shared-infra.svc.cluster.local:7687
+  ollama: http://ollama.shared-infra.svc.cluster.local:11434

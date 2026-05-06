@@ -1,0 +1,55 @@
+{
+  "realm": "pms-dev",
+  "enabled": true,
+  "displayName": "PMS Dev Realm",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "clients": [
+    {
+      "clientId": "pms-web",
+      "name": "PMS Web",
+      "description": "Local OIDC client for PMS",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "pms-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*",
+        "http://localhost:3100/*",
+        "http://127.0.0.1:3100/*",
+        "http://localhost:8000/*",
+        "http://127.0.0.1:8000/*",
+        "https://app.example.com/callback",
+        "https://pms.example.com/callback"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "rootUrl": "http://localhost:3000"
+    }
+  ],
+  "users": [
+    {
+      "username": "pms-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "PMS",
+      "lastName": "Admin",
+      "email": "pms-admin@example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "PmsAdmin123!",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

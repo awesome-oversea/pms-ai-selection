@@ -1,0 +1,73 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+
+# Local agent and tool state
+.plan/
+.qoder/
+.workbuddy/
+.claude/settings*.json
+
+# Python cache and packaging
+__pycache__/
+*.py[cod]
+*.pyc.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.pyre/
+.tox/
+.nox/
+.venv/
+venv/
+.python-version
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+build/
+dist/
+site/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Frontend and Node.js artifacts
+node_modules/
+.next/
+.npm/
+.pnpm-store/
+*.tsbuildinfo
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+env/*.shared
+!env/*.shared.example
+docker/dify-self-host/runtime/**/.env
+
+# Runtime markers, logs, and temp output
+.qdrant-initialized
+*.log
+*.pid
+*.pid.lock
+*.seed
+*.stackdump
+artifacts/
+logs/
+_tmp/
+snapshots/tmp/
+
+# Local data stores and service state
+data/*.db
+data/*.db-*
+data/lake/
+data/local_pilot/
+data/nflog
+data/silences
+storage/

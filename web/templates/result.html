@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🎯 AI选品系统</div>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/selection">选品任务</a>
+            <a href="/approval">审批管理</a>
+            <a href="/agents/monitor">Agent监控</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>📊 选品分析结果</h1>
+            <p class="subtitle">任务ID: <code>{{ task_id }}</code></p>
+            {% if nextjs_entry %}
+            <p class="text-muted">正式入口已迁移至 <a href="{{ nextjs_entry }}">{{ nextjs_entry }}</a>，当前页面作为 legacy 兼容保留。</p>
+            {% endif %}
+        </div>
+
+        {% if task and task.status == 'completed' %}
+        <section class="card decision-card">
+            <h2>🎯 最终决策</h2>
+            {% set gng = task.result.decision if task.result else None %}
+            {% if gng %}
+            <div class="decision-banner decision-{{ gng.decision|lower }}">
+                <div class="decision-icon">
+                    {% if gng.decision == 'GO' %}✅
+                    {% elif gng.decision == 'CONDITIONAL_GO' %}⚠️
+                    {% else %}❌{% endif %}
+                </div>
+                <div class="decision-info">
+                    <div class="decision-text">{{ gng.decision }}</div>
+                    <div class="decision-score">综合评分: {{ gng.score | round(1) }}/100</div>
+                    <div class="decision-confidence">置信度: {{ gng.confidence | round(1) }}%</div>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>决策数据暂不可用</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <div class="results-grid">
+            <section class="card result-section">
+                <h2>📈 市场洞察</h2>
+                {% set market = task.result.results.market_analysis if task.result and task.result.results else None %}
+                {% if market %}
+                <div class="result-content">
+                    <div class="metric-row">
+                        <span class="metric-label">市场规模估算</span>
+                        <span class="metric-value">{{ market.market_size_estimate | default('N/A') }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">供需比</span>
+                        <span class="metric-value">{{ market.supply_demand_ratio | default('N/A') }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">竞争强度</span>
+                        <span class="metric-value">{{ market.competition_level | default('N/A') }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">机会评分</span>
+                        <span class="metric-value highlight">{{ market.opportunity_score | default('N/A') }}/100</span>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted">市场分析数据加载中...</p>
+                {% endif %}
+            </section>
+
+            <section class="card result-section">
+                <h2>📦 产品规划</h2>
+                {% set product = task.result.results.product_planning if task.result and task.result.results else None %}
+                {% if product %}
+                <div class="result-content">
+                    <div class="metric-row">
+                        <span class="metric-label">推荐产品名</span>
+                        <span class="metric-value">{{ product.name | default('N/A') }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">差异化评分</span>
+                        <span class="metric-value highlight">{{ product.differentiation_score | default('N/A') }}/100</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">供应链风险</span>
+                        <span class="metric-value">{{ product.supply_chain_risk | default('N/A') }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted">产品规划数据加载中...</p>
+                {% endif %}
+            </section>
+
+            <section class="card result-section full-width">
+                <h2>💰 商业化评估</h2>
+                {% set commercial = task.result.results.commercial if task.result and task.result.results else None %}
+                {% if commercial %}
+                <div class="result-content commercial-grid">
+                    <div class="commercial-item">
+                        <h4>财务预测 (12个月)</h4>
+                        <div class="metric-row">
+                            <span>月收入预估</span>
+                            <span>${{ commercial.monthly_revenue_12m | default(0) | round(0) }}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span>毛利率</span>
+                            <span>{{ commercial.gross_margin_pct | default(0) | round(1) }}%</span>
+                        </div>
+                        <div class="metric-row">
+                            <span>净利率</span>
+                            <span>{{ commercial.net_margin_pct | default(0) | round(1) }}%</span>
+                        </div>
+                    </div>
+                    <div class="commercial-item">
+                        <h4>风险评估</h4>
+                        <div class="metric-row">
+                            <span>市场风险</span>
+                            <span>{{ commercial.market_risk | default('N/A') }}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span>运营风险</span>
+                            <span>{{ commercial.operational_risk | default('N/A') }}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span>综合风险分</span>
+                            <span>{{ commercial.overall_risk_score | default(0) | round(1) }}/100</span>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted">商业化评估数据加载中...</p>
+                {% endif %}
+            </section>
+        </div>
+
+        <section class="card actions-card">
+            <h2>📋 后续操作</h2>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="window.print()">🖨️ 打印报告</button>
+                <a href="/selection" class="btn btn-secondary">➕ 新建任务</a>
+                <a href="/" class="btn btn-secondary">🏠 返回首页</a>
+            </div>
+        </section>
+
+        {% elif task and task.status == 'running' %}
+        <section class="card running-state">
+            <div class="loading-spinner"></div>
+            <h2>⏳ 任务执行中</h2>
+            <p>当前阶段: <strong>{{ task.phase }}</strong></p>
+            <p class="text-muted">AI正在分析中，请稍候...</p>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="taskProgress" style="width: 50%"></div>
+            </div>
+            <button class="btn btn-secondary" onclick="location.reload()">🔄 刷新状态</button>
+        </section>
+
+        {% elif task and task.status == 'failed' %}
+        <section class="card error-state">
+            <h2>❌ 任务失败</h2>
+            <p>错误信息: <code>{{ task.error or '未知错误' }}</code></p>
+            <a href="/selection" class="btn btn-primary">重新创建任务</a>
+        </section>
+
+        {% else %}
+        <section class="card not-found">
+            <h2>🔍 任务未找到</h2>
+            <p>该任务可能不存在或已被删除</p>
+            <a href="/selection" class="btn btn-primary">查看所有任务</a>
+        </section>
+        {% endif %}
+    </main>
+
+    <footer class="footer">
+        <p>AI选品系统 v1.0 &copy; 2024 | Powered by Multi-Agent Framework</p>
+    </footer>
+
+    <script src="/static/js/result.js"></script>
+</body>
+</html>

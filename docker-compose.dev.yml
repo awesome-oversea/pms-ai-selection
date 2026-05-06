@@ -1,0 +1,192 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    pull_policy: if_not_present
+    container_name: pms-dev-postgres
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_wal_senders=10", "-c", "max_replication_slots=10"]
+    environment:
+      POSTGRES_USER: pms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pms_dev_2024}
+      POSTGRES_DB: pms_db
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - ${PMS_DATA_ROOT:-/data/pms}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pms -d pms_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    pull_policy: if_not_present
+    container_name: pms-dev-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - ${PMS_DATA_ROOT:-/data/pms}/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.9.5
+    pull_policy: if_not_present
+    container_name: pms-dev-qdrant
+    ports:
+      - "${QDRANT_HOST_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_HOST_PORT:-6334}:6334"
+    volumes:
+      - ${PMS_DATA_ROOT:-/data/pms}/qdrant:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/6333'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    pull_policy: if_not_present
+    container_name: pms-dev-opensearch
+    environment:
+      discovery.type: single-node
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: ${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+    ports:
+      - "${SEARCH_HOST_PORT:-19200}:9200"
+      - "${SEARCH_METRICS_PORT:-19600}:9600"
+    volumes:
+      - ${PMS_DATA_ROOT:-/data/pms}/opensearch:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200 >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j:5.26-community
+    pull_policy: if_not_present
+    container_name: pms-dev-neo4j
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/pms_graph_dev}
+      NEO4J_server_memory_heap_initial__size: ${NEO4J_HEAP_INIT:-512m}
+      NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP_MAX:-512m}
+      NEO4J_server_memory_pagecache_size: ${NEO4J_PAGECACHE:-512m}
+      NEO4J_server_jvm_additional: -XX:+ExitOnOutOfMemoryError
+    ports:
+      - "${NEO4J_HTTP_PORT:-17474}:7474"
+      - "${NEO4J_BOLT_PORT:-17687}:7687"
+    volumes:
+      - ${PMS_DATA_ROOT:-/data/pms}/neo4j/data:/data
+      - ${PMS_DATA_ROOT:-/data/pms}/neo4j/logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'RETURN 1;' | /var/lib/neo4j/bin/cypher-shell -a bolt://127.0.0.1:7687 -u neo4j -p ${NEO4J_PASSWORD:-pms_graph_dev} --non-interactive >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 20s
+      start_period: 60s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PMS_PYTHON_EXTRAS: ${PMS_DOCKER_PYTHON_EXTRAS:-local-ai}
+    image: ${PMS_APP_IMAGE:-pms-app:dev}
+    container_name: pms-dev-app
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-development}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      APP_API_PREFIX: ${APP_API_PREFIX:-/api/v1}
+      DB_URL: postgresql+asyncpg://pms:${POSTGRES_PASSWORD:-pms_dev_2024}@postgres:5432/pms_db
+      REDIS_URL: redis://redis:6379/0
+      SEARCH_ENABLED: ${SEARCH_ENABLED:-true}
+      SEARCH_BACKEND: ${SEARCH_BACKEND:-opensearch}
+      SEARCH_ENDPOINT: http://opensearch:9200
+      SEARCH_TIMEOUT_SECONDS: ${SEARCH_TIMEOUT_SECONDS:-15}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      NEO4J_URI: bolt://neo4j:7687
+      LLM_OLLAMA_ENDPOINT: ${LLM_OLLAMA_ENDPOINT:-http://ollama:11434}
+      HF_HOME: ${HF_HOME:-/app/.cache/huggingface}
+      TRANSFORMERS_CACHE: ${TRANSFORMERS_CACHE:-/app/.cache/huggingface}
+      SENTENCE_TRANSFORMERS_HOME: ${SENTENCE_TRANSFORMERS_HOME:-/app/.cache/sentence-transformers}
+      WHISPER_CACHE_DIR: ${WHISPER_CACHE_DIR:-/app/.cache/whisper}
+      SEC_SECRET_KEY: ${SEC_SECRET_KEY:-dev-secret-key-for-testing-only-not-for-production!!}
+      REPORT_CENTER_STATE_PATH: ${REPORT_CENTER_STATE_PATH:-/app/artifacts/report_center/dev-state.json}
+    volumes:
+      - ${PMS_CACHE_ROOT:-/data/pms/cache}:/app/.cache
+      - ${PMS_ARTIFACTS_ROOT:-/data/pms/artifacts}:/app/artifacts
+    ports:
+      - "${APP_HOST_PORT:-18000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      opensearch:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    restart: unless-stopped
+
+  kong-gateway:
+    image: kong:3.8
+    pull_policy: if_not_present
+    container_name: pms-dev-kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_DECLARATIVE_CONFIG: /opt/kong/kong.yml
+    ports:
+      - "${KONG_PROXY_PORT:-8000}:8000"
+      - "${KONG_ADMIN_PORT:-8001}:8001"
+    volumes:
+      - ./docker/kong/kong.compose-app.yml:/opt/kong/kong.yml:ro
+    depends_on:
+      app:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+    restart: unless-stopped
+
+  ollama:
+    profiles: ["gpu-llm"]
+    image: ollama/ollama
+    pull_policy: if_not_present
+    container_name: pms-dev-ollama
+    gpus: all
+    ports:
+      - "${OLLAMA_HOST_PORT:-11434}:11434"
+    volumes:
+      - ${PMS_OLLAMA_ROOT:-/data/pms/ollama}:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  default:
+    name: pms-network

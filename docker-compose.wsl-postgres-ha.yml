@@ -1,0 +1,125 @@
+services:
+  pg-primary:
+    image: bitnamilegacy/postgresql-repmgr:17.6.0-debian-12-r2
+    container_name: pms-pg-primary-wsl
+    hostname: pg-primary-0
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: ${PGHA_POSTGRES_PASSWORD:-postgres_dev_2024}
+      POSTGRESQL_USERNAME: pms
+      POSTGRESQL_PASSWORD: ${PGHA_APP_PASSWORD:-pms_dev_2024}
+      POSTGRESQL_DATABASE: pms_db
+      POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS: 1
+      REPMGR_PASSWORD: ${PGHA_REPMGR_PASSWORD:-repmgr_dev_2024}
+      REPMGR_PRIMARY_HOST: pg-primary-0
+      REPMGR_PARTNER_NODES: pg-primary-0,pg-standby-1,pg-standby-2
+      REPMGR_NODE_NAME: pg-primary-0
+      REPMGR_NODE_NETWORK_NAME: pg-primary-0
+      REPMGR_NODE_ID: "1"
+      REPMGR_NODE_PRIORITY: "100"
+    ports:
+      - "15435:5432"
+    volumes:
+      - pg_primary_data:/bitnami/postgresql
+    networks:
+      default:
+        aliases:
+          - pg-primary-0
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U pms -d pms_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  pg-standby-1:
+    image: bitnamilegacy/postgresql-repmgr:17.6.0-debian-12-r2
+    container_name: pms-pg-standby-1-wsl
+    depends_on:
+      pg-primary:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: ${PGHA_POSTGRES_PASSWORD:-postgres_dev_2024}
+      POSTGRESQL_USERNAME: pms
+      POSTGRESQL_PASSWORD: ${PGHA_APP_PASSWORD:-pms_dev_2024}
+      POSTGRESQL_DATABASE: pms_db
+      REPMGR_PASSWORD: ${PGHA_REPMGR_PASSWORD:-repmgr_dev_2024}
+      REPMGR_PRIMARY_HOST: pg-primary-0
+      REPMGR_PARTNER_NODES: pg-primary-0,pg-standby-1,pg-standby-2
+      REPMGR_NODE_NAME: pg-standby-1
+      REPMGR_NODE_NETWORK_NAME: pg-standby-1
+      REPMGR_NODE_ID: "2"
+      REPMGR_NODE_PRIORITY: "90"
+    ports:
+      - "15436:5432"
+    volumes:
+      - pg_standby_1_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U pms -d pms_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  pg-standby-2:
+    image: bitnamilegacy/postgresql-repmgr:17.6.0-debian-12-r2
+    container_name: pms-pg-standby-2-wsl
+    depends_on:
+      pg-primary:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: ${PGHA_POSTGRES_PASSWORD:-postgres_dev_2024}
+      POSTGRESQL_USERNAME: pms
+      POSTGRESQL_PASSWORD: ${PGHA_APP_PASSWORD:-pms_dev_2024}
+      POSTGRESQL_DATABASE: pms_db
+      REPMGR_PASSWORD: ${PGHA_REPMGR_PASSWORD:-repmgr_dev_2024}
+      REPMGR_PRIMARY_HOST: pg-primary-0
+      REPMGR_PARTNER_NODES: pg-primary-0,pg-standby-1,pg-standby-2
+      REPMGR_NODE_NAME: pg-standby-2
+      REPMGR_NODE_NETWORK_NAME: pg-standby-2
+      REPMGR_NODE_ID: "3"
+      REPMGR_NODE_PRIORITY: "80"
+    ports:
+      - "15437:5432"
+    volumes:
+      - pg_standby_2_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U pms -d pms_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  pgpool:
+    image: bitnamilegacy/pgpool:4.6.3
+    container_name: pms-pgpool-wsl
+    depends_on:
+      pg-primary:
+        condition: service_healthy
+      pg-standby-1:
+        condition: service_healthy
+      pg-standby-2:
+        condition: service_healthy
+    environment:
+      PGPOOL_BACKEND_NODES: 0:pg-primary:5432,1:pg-standby-1:5432,2:pg-standby-2:5432
+      PGPOOL_BACKEND_APPLICATION_NAMES: pg-primary-0,pg-standby-1,pg-standby-2
+      PGPOOL_SR_CHECK_USER: repmgr
+      PGPOOL_SR_CHECK_PASSWORD: ${PGHA_REPMGR_PASSWORD:-repmgr_dev_2024}
+      PGPOOL_ENABLE_LDAP: "no"
+      PGPOOL_FAILOVER_ON_BACKEND_ERROR: "on"
+      PGPOOL_AUTO_FAILBACK: "yes"
+      PGPOOL_POSTGRES_USERNAME: postgres
+      PGPOOL_POSTGRES_PASSWORD: ${PGHA_POSTGRES_PASSWORD:-postgres_dev_2024}
+      PGPOOL_ADMIN_USERNAME: admin
+      PGPOOL_ADMIN_PASSWORD: ${PGHA_PGPOOL_ADMIN_PASSWORD:-pgpool_admin_2024}
+      PGPOOL_POSTGRES_CUSTOM_USERS: pms
+      PGPOOL_POSTGRES_CUSTOM_PASSWORDS: ${PGHA_APP_PASSWORD:-pms_dev_2024}
+      PGPOOL_ENABLE_LOAD_BALANCING: "yes"
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=\"$$PGPOOL_POSTGRES_PASSWORD\" psql -h 127.0.0.1 -p 5432 -U postgres -d pms_db -tAc 'select 1' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  pg_primary_data:
+  pg_standby_1_data:
+  pg_standby_2_data:

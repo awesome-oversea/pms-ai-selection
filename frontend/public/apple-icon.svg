@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="AI选品中枢 Apple 图标">
+  <rect width="180" height="180" rx="40" fill="#07111f" />
+  <rect x="16" y="16" width="148" height="148" rx="32" fill="#1d4ed8" opacity="0.22" />
+  <path d="M55 126V54h34c23 0 38 14 38 35s-15 37-38 37H55zm21-18h12c11 0 19-8 19-19s-8-17-19-17H76v36z" fill="#eff6ff" />
+  <path d="M120 63h15l-21 54h-15l21-54z" fill="#bfdbfe" />
+</svg>

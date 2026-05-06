@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-primary {
+            border-left: 4px solid #007bff;
+        }
+        .stat-success {
+            border-left: 4px solid #28a745;
+        }
+        .stat-warning {
+            border-left: 4px solid #ffc107;
+        }
+        .stat-danger {
+            border-left: 4px solid #dc3545;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .task-filter {
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .filter-group label {
+            font-weight: 500;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0069d9;
+        }
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid #6c757d;
+            color: #6c757d;
+        }
+        .btn-outline:hover {
+            background-color: #f8f9fa;
+        }
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .form-group label {
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group select {
+            padding: 0.5rem;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .submit-result {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 4px;
+        }
+        .submit-result.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .submit-result.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .submit-result.hidden {
+            display: none;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .data-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .data-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .text-muted {
+            color: #6c757d;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6c757d;
+        }
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        .badge-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .badge-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .badge-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .badge-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 8px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .modal-body {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .phase-indicator {
+            display: flex;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+        .phase-item {
+            flex: 1;
+            padding: 0.5rem;
+            text-align: center;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        .phase-completed {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .phase-current {
+            background-color: #cce7ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+        .phase-pending {
+            background-color: #f8f9fa;
+            color: #6c757d;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">AI选品系统</div>
+        <div class="nav-links">
+            <a href="/dashboard">仪表盘</a>
+            <a href="/selection">旧版任务页</a>
+            <a href="/workbench/selection" class="active">正式工作台</a>
+            <a href="/docs">API文档</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>正式选品工作台</h1>
+            <p class="subtitle">AI驱动的智能选品平台，帮助您发现高潜力产品</p>
+        </div>
+
+        <section class="card" style="margin-bottom: 1rem;">
+            <h2>用户登录</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="loginUsername">用户名</label>
+                    <input id="loginUsername" type="text" placeholder="请输入用户名" value="admin">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">密码</label>
+                    <input id="loginPassword" type="password" placeholder="请输入密码" value="admin123">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button id="loginBtn" class="btn btn-primary">登录</button>
+                <button id="logoutBtn" class="btn btn-outline">退出</button>
+            </div>
+            <div id="authStatus" class="submit-result" style="margin-top: 1rem;">未登录</div>
+        </section>
+
+        <section class="card" style="margin-bottom: 1rem;">
+            <h2>工作台汇总</h2>
+            <div id="summaryPanel" class="stats-grid">
+                <div class="stat-card stat-primary">
+                    <div class="stat-value" id="totalTasks">0</div>
+                    <div class="stat-label">总任务数</div>
+                </div>
+                <div class="stat-card stat-success">
+                    <div class="stat-value" id="completedTasks">0</div>
+                    <div class="stat-label">已完成</div>
+                </div>
+                <div class="stat-card stat-warning">
+                    <div class="stat-value" id="runningTasks">0</div>
+                    <div class="stat-label">运行中</div>
+                </div>
+                <div class="stat-card stat-danger">
+                    <div class="stat-value" id="failedTasks">0</div>
+                    <div class="stat-label">失败</div>
+                </div>
+                <div class="stat-card stat-info">
+                    <div class="stat-value" id="successRate">0%</div>
+                    <div class="stat-label">成功率</div>
+                </div>
+                <div class="stat-card stat-info">
+                    <div class="stat-value" id="goDecisionRate">0%</div>
+                    <div class="stat-label">推荐率</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card" style="margin-bottom: 1rem;">
+            <h2>任务模板</h2>
+            <div class="task-filter">
+                <button id="templateElectronics" class="btn btn-outline">电子产品模板</button>
+                <button id="templateHomeGarden" class="btn btn-outline">家居园艺模板</button>
+                <button id="templateBeauty" class="btn btn-outline">美妆个护模板</button>
+                <button id="templateSports" class="btn btn-outline">运动户外模板</button>
+            </div>
+        </section>
+
+        <section class="card" style="margin-bottom: 1rem;">
+            <h2>创建选品任务</h2>
+            <form id="workbenchTaskForm" class="task-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="query">产品关键词 *</label>
+                        <input type="text" id="query" name="query" required minlength="2" placeholder="例如：蓝牙耳机">
+                    </div>
+                    <div class="form-group">
+                        <label for="category">产品类目</label>
+                        <select id="category" name="category">
+                            <option value="electronics">电子产品</option>
+                            <option value="wearables">可穿戴设备</option>
+                            <option value="home_garden">家居园艺</option>
+                            <option value="beauty">美妆个护</option>
+                            <option value="sports">运动户外</option>
+                            <option value="toys">玩具</option>
+                            <option value="books">图书</option>
+                            <option value="food">食品</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="market">目标市场</label>
+                        <select id="market" name="target_market">
+                            <option value="US">美国</option>
+                            <option value="EU">欧洲</option>
+                            <option value="UK">英国</option>
+                            <option value="JP">日本</option>
+                            <option value="AU">澳大利亚</option>
+                            <option value="CA">加拿大</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="budget">投资预算 (USD)</label>
+                        <input type="number" id="budget" name="investment_budget" value="50000" min="1000" step="1000">
+                    </div>
+                    <div class="form-group">
+                        <label for="priority">任务优先级</label>
+                        <select id="priority" name="priority">
+                            <option value="low">低</option>
+                            <option value="normal">普通</option>
+                            <option value="high">高</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="autoApprove">自动审批</label>
+                        <input type="checkbox" id="autoApprove" name="auto_approve">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">创建选品任务</button>
+                    <button type="reset" class="btn btn-outline">重置</button>
+                </div>
+            </form>
+            <div id="createResult" class="submit-result hidden"></div>
+        </section>
+
+        <section class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>任务列表</h2>
+                <div class="task-filter">
+                    <div class="filter-group">
+                        <label for="statusFilter">状态:</label>
+                        <select id="statusFilter">
+                            <option value="">全部</option>
+                            <option value="pending">待处理</option>
+                            <option value="running">运行中</option>
+                            <option value="completed">已完成</option>
+                            <option value="failed">失败</option>
+                        </select>
+                    </div>
+                    <button id="refreshBtn" class="btn btn-outline btn-sm">刷新</button>
+                </div>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>任务ID</th>
+                        <th>查询关键词</th>
+                        <th>目标市场</th>
+                        <th>状态</th>
+                        <th>阶段</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="workbenchTasksBody">
+                    <tr><td colspan="7" class="loading">请先登录</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <!-- 任务详情模态框 -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">任务详情</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body" id="taskModalBody">
+                <!-- 任务详情内容将通过JavaScript动态填充 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/workbench_selection.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+services:
+  - name: pms-internal-service
+    url: http://host.docker.internal:18000
+  - name: pms-bff-service
+    url: http://host.docker.internal:18000
+  - name: pms-openapi-service
+    url: http://host.docker.internal:18000

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="AI选品中枢图标">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#60a5fa" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="#07111f" />
+  <rect x="24" y="24" width="208" height="208" rx="44" fill="url(#bg)" opacity="0.18" />
+  <path d="M78 176V80h46c30 0 50 18 50 47s-20 49-50 49H78zm28-24h16c14 0 24-10 24-25 0-14-10-23-24-23h-16v48z" fill="#e0f2fe" />
+  <path d="M168 92h22l-30 72h-22l30-72z" fill="#dbeafe" opacity="0.9" />
+</svg>

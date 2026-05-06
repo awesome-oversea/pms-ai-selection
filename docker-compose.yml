@@ -1,0 +1,113 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pms-postgres
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_wal_senders=10", "-c", "max_replication_slots=10"]
+    environment:
+      POSTGRES_USER: pms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pms_dev_2024}
+      POSTGRES_DB: pms_db
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pms -d pms_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pms-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  qdrant:
+    image: qdrant/qdrant:v1.9.5
+    container_name: pms-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/6333'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  crawler-worker:
+    profiles: ["worker-jobs"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pms-crawler-worker
+    command: python -m src.workers.crawl_runner --query bluetooth-speaker --mode mock
+    environment:
+      APP_ENVIRONMENT: development
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    profiles: ["app-image"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PMS_PYTHON_EXTRAS: ${PMS_DOCKER_PYTHON_EXTRAS:-local-ai}
+    container_name: pms-app
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-development}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-DEBUG}
+      APP_API_PREFIX: ${APP_API_PREFIX:-/api/v1}
+      DB_URL: postgresql+asyncpg://pms:${POSTGRES_PASSWORD:-pms_dev_2024}@postgres:5432/pms_db
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      LLM_OLLAMA_ENDPOINT: ${DOCKER_APP_LLM_OLLAMA_ENDPOINT:-http://ollama:11434}
+      HF_HOME: ${HF_HOME:-/app/.cache/huggingface}
+      TRANSFORMERS_CACHE: ${TRANSFORMERS_CACHE:-/app/.cache/huggingface}
+      SENTENCE_TRANSFORMERS_HOME: ${SENTENCE_TRANSFORMERS_HOME:-/app/.cache/sentence-transformers}
+      WHISPER_CACHE_DIR: ${WHISPER_CACHE_DIR:-/app/.cache/whisper}
+      SEC_SECRET_KEY: ${SEC_SECRET_KEY:-dev-secret-key-for-testing-only-not-for-production!!}
+      SEC_LOCAL_BOOTSTRAP_SUPERUSER_ENABLED: ${SEC_LOCAL_BOOTSTRAP_SUPERUSER_ENABLED:-false}
+      SEC_LOCAL_BOOTSTRAP_SUPERUSER_USERNAME: ${SEC_LOCAL_BOOTSTRAP_SUPERUSER_USERNAME:-}
+      SEC_LOCAL_BOOTSTRAP_SUPERUSER_PASSWORD: ${SEC_LOCAL_BOOTSTRAP_SUPERUSER_PASSWORD:-}
+      SEC_LOCAL_BOOTSTRAP_SUPERUSER_EMAIL: ${SEC_LOCAL_BOOTSTRAP_SUPERUSER_EMAIL:-}
+      REPORT_CENTER_STATE_PATH: ${REPORT_CENTER_STATE_PATH:-artifacts/report_center/local-state.json}
+    volumes:
+      - ${LOCAL_MODEL_CACHE_DIR:-D:/aitools/fms/model-cache}:/app/.cache
+    ports:
+      - "${APP_HOST_PORT:-18000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  redis_data:
+  qdrant_data:
+
+networks:
+  default:
+    name: pms-network

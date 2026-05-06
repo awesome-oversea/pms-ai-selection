@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🎯 AI选品系统</div>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/selection">选品任务</a>
+            <a href="/approval">审批管理</a>
+            <a href="/agents/monitor" class="active">Agent监控</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>🤖 Agent监控面板</h1>
+            <p class="subtitle">实时监控Multi-Agent系统的运行状态和性能指标</p>
+            {% if nextjs_entry %}
+            <p class="text-muted">正式入口已迁移至 <a href="{{ nextjs_entry }}">{{ nextjs_entry }}</a>，当前页面作为 legacy 兼容保留。</p>
+            {% endif %}
+        </div>
+
+        <section class="card agents-overview">
+            <h2>📡 Agent状态总览</h2>
+            <div class="agents-grid" id="agentsGrid">
+                {% for agent in agents %}
+                <div class="agent-card" id="agent-{{ agent.name }}">
+                    <div class="agent-header">
+                        <div class="agent-icon">
+                            {% if agent.type == 'market_insight' %}📊
+                            {% elif agent.type == 'product_planner' %}📦
+                            {% elif agent.type == 'commercial' %}💰
+                            {% else %}🤖{% endif %}
+                        </div>
+                        <div class="agent-name">{{ agent.name }}</div>
+                        <span class="agent-type-badge badge-{{ agent.type }}">{{ agent.type }}</span>
+                    </div>
+                    <div class="agent-body">
+                        <p class="agent-description">{{ agent.description }}</p>
+                        <div class="agent-meta">
+                            <span>v{{ agent.version }}</span>
+                        </div>
+                    </div>
+                    <div class="agent-footer">
+                        <button class="btn btn-sm btn-outline"
+                                onclick="checkHealth('{{ agent.name }}')">健康检查</button>
+                        <button class="btn btn-sm btn-outline"
+                                onclick="showDetails('{{ agent.name }}')">详情</button>
+                    </div>
+                    <div class="agent-status-bar" id="status-{{ agent.name }}"></div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card agent-health-section">
+            <h2>🏥 健康检查结果</h2>
+            <div id="healthCheckResult" class="health-result-placeholder">
+                <p class="text-muted">点击Agent卡片上的"健康检查"按钮查看状态</p>
+            </div>
+        </section>
+
+        <section class="card agent-details-section hidden" id="agentDetailsSection">
+            <h2>🔍 Agent详情: <span id="detailAgentName"></span></h2>
+            <div id="agentDetailContent"></div>
+        </section>
+
+        <section class="card workflow-monitor">
+            <h2>⚙️ 工作流监控</h2>
+            <div class="workflow-info">
+                <div class="workflow-item">
+                    <span class="workflow-label">当前活跃工作流</span>
+                    <span class="workflow-value" id="activeWorkflows">0</span>
+                </div>
+                <div class="workflow-item">
+                    <span class="workflow-label">今日完成工作流</span>
+                    <span class="workflow-value" id="completedWorkflows">0</span>
+                </div>
+                <div class="workflow-item">
+                    <span class="workflow-label">平均执行时间</span>
+                    <span class="workflow-value" id="avgExecutionTime">-</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>AI选品系统 v1.0 &copy; 2024 | Powered by Multi-Agent Framework</p>
+    </footer>
+
+    <script src="/static/js/agents.js"></script>
+</body>
+</html>

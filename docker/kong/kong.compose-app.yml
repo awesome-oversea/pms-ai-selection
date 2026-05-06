@@ -1,0 +1,97 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: pms-internal-service
+    url: http://app:8000
+    routes:
+      - name: pms-internal-route
+        paths:
+          - /api/v1/internal
+          - /api/v1/selection
+          - /api/v1/knowledge
+          - /api/v1/agents
+          - /api/v1/llm
+          - /api/v1/system
+        strip_path: false
+        methods: [GET, POST, PUT, DELETE]
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - X-Gateway-Layer:internal
+
+  - name: pms-bff-service
+    url: http://app:8000
+    routes:
+      - name: pms-bff-route
+        paths:
+          - /api/v1/bff
+        strip_path: false
+        methods: [GET, POST, DELETE]
+    plugins:
+      - name: key-auth
+        config:
+          key_names: [x-api-key]
+          hide_credentials: false
+      - name: rate-limiting
+        config:
+          minute: 120
+          policy: local
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - X-Gateway-Layer:bff
+
+  - name: pms-openapi-service
+    url: http://app:8000
+    routes:
+      - name: pms-openapi-route
+        paths:
+          - /openapi
+          - /docs
+          - /redoc
+        strip_path: false
+        methods: [GET]
+
+plugins:
+  - name: request-transformer
+    route: pms-internal-route
+    config:
+      add:
+        headers:
+          - X-Gateway-Layer:internal
+  - name: key-auth
+    route: pms-bff-route
+    config:
+      key_names: [x-api-key]
+      hide_credentials: false
+  - name: rate-limiting
+    route: pms-bff-route
+    config:
+      minute: 120
+      policy: local
+  - name: request-transformer
+    route: pms-bff-route
+    config:
+      add:
+        headers:
+          - X-Gateway-Layer:bff
+  - name: rate-limiting
+    route: pms-openapi-route
+    config:
+      minute: 30
+      policy: local
+  - name: request-transformer
+    route: pms-openapi-route
+    config:
+      add:
+        headers:
+          - X-Gateway-Layer:openapi
+
+consumers:
+  - username: bff-client
+    keyauth_credentials:
+      - key: bff-demo-key

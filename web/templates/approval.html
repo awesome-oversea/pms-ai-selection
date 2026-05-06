@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🎯 AI选品系统</div>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/selection">选品任务</a>
+            <a href="/approval" class="active">审批管理</a>
+            <a href="/agents/monitor">Agent监控</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>✅ 审批管理</h1>
+            <p class="subtitle">人机协作审批 - 处理需要人工确认的决策节点</p>
+            {% if nextjs_entry %}
+            <p class="text-muted">正式入口已迁移至 <a href="{{ nextjs_entry }}">{{ nextjs_entry }}</a>，当前页面作为 legacy 兼容保留。</p>
+            {% endif %}
+        </div>
+
+        <div class="approval-stats">
+            <div class="stat-card stat-warning">
+                <div class="stat-value" id="pendingCount">0</div>
+                <div class="stat-label">待审批</div>
+            </div>
+            <div class="stat-card stat-success">
+                <div class="stat-value" id="approvedCount">0</div>
+                <div class="stat-label">已批准</div>
+            </div>
+            <div class="stat-card stat-danger">
+                <div class="stat-value" id="rejectedCount">0</div>
+                <div class="stat-label">已拒绝</div>
+            </div>
+            <div class="stat-card stat-primary">
+                <div class="stat-value" id="autoApprovedCount">0</div>
+                <div class="stat-label">自动批准</div>
+            </div>
+        </div>
+
+        <section class="card approval-list-card">
+            <h2>📋 待审批请求</h2>
+
+            <div id="pendingApprovals">
+                <div class="empty-state">
+                    <p>暂无待审批的请求</p>
+                    <p class="text-muted">当AI分析结果需要人工确认时，会在此显示</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="card approval-history-card">
+            <h2>📜 审批历史</h2>
+
+            <table class="data-table" id="approvalHistoryTable">
+                <thead>
+                    <tr>
+                        <th>请求ID</th>
+                        <th>关联任务</th>
+                        <th>Agent</th>
+                        <th>操作类型</th>
+                        <th>状态</th>
+                        <th>审批人</th>
+                        <th>时间</th>
+                    </tr>
+                </thead>
+                <tbody id="approvalHistoryBody">
+                    <tr><td colspan="7" class="loading">加载中...</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card approval-config-card">
+            <h2>⚙️ 审批规则配置</h2>
+            <form id="approvalConfigForm" class="config-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="autoApproveThreshold">自动批准阈值</label>
+                        <input type="number" id="autoApproveThreshold" value="80"
+                               min="0" max="100" step="5">
+                        <small>评分高于此值的请求将自动批准 (0-100)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="timeoutSeconds">超时时间(秒)</label>
+                        <input type="number" id="timeoutSeconds" value="3600"
+                               min="60" max="86400" step="60">
+                        <small>超过此时间未处理的请求将被标记为超时</small>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">💾 保存配置</button>
+                </div>
+            </form>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>AI选品系统 v1.0 &copy; 2024 | Powered by Multi-Agent Framework</p>
+    </footer>
+
+    <script src="/static/js/approval.js"></script>
+</body>
+</html>

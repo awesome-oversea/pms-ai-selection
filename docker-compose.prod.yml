@@ -1,0 +1,103 @@
+services:
+  app:
+    image: ${PMS_APP_IMAGE:-pms-app:prod}
+    pull_policy: if_not_present
+    container_name: pms-prod-app
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      APP_API_PREFIX: ${APP_API_PREFIX:-/api/v1}
+      DB_URL: ${DB_URL:?set DB_URL}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+      SEARCH_ENABLED: ${SEARCH_ENABLED:-true}
+      SEARCH_BACKEND: ${SEARCH_BACKEND:-opensearch}
+      SEARCH_ENDPOINT: ${SEARCH_ENDPOINT:?set SEARCH_ENDPOINT}
+      SEARCH_TIMEOUT_SECONDS: ${SEARCH_TIMEOUT_SECONDS:-15}
+      QDRANT_HOST: ${QDRANT_HOST:-qdrant}
+      QDRANT_PORT: ${QDRANT_PORT:-6333}
+      QDRANT_URL: ${QDRANT_URL:-}
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      LLM_OLLAMA_ENDPOINT: ${LLM_OLLAMA_ENDPOINT:-http://ollama:11434}
+      HF_HOME: ${HF_HOME:-/app/.cache/huggingface}
+      TRANSFORMERS_CACHE: ${TRANSFORMERS_CACHE:-/app/.cache/huggingface}
+      SENTENCE_TRANSFORMERS_HOME: ${SENTENCE_TRANSFORMERS_HOME:-/app/.cache/sentence-transformers}
+      WHISPER_CACHE_DIR: ${WHISPER_CACHE_DIR:-/app/.cache/whisper}
+      SEC_SECRET_KEY: ${SEC_SECRET_KEY:?set SEC_SECRET_KEY}
+      REPORT_CENTER_STATE_PATH: ${REPORT_CENTER_STATE_PATH:-/app/artifacts/report_center/prod-state.json}
+    volumes:
+      - ${PMS_CACHE_ROOT:-/data/pms/cache}:/app/.cache
+      - ${PMS_ARTIFACTS_ROOT:-/data/pms/artifacts}:/app/artifacts
+    ports:
+      - "${APP_HOST_PORT:-18000}:8000"
+    restart: unless-stopped
+
+  kong-gateway:
+    image: kong:3.8
+    pull_policy: if_not_present
+    container_name: pms-prod-kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_DECLARATIVE_CONFIG: /opt/kong/kong.yml
+    ports:
+      - "${KONG_PROXY_PORT:-8000}:8000"
+      - "${KONG_ADMIN_PORT:-8001}:8001"
+    volumes:
+      - ./docker/kong/kong.compose-app.yml:/opt/kong/kong.yml:ro
+    depends_on:
+      app:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+    restart: unless-stopped
+
+  app-worker:
+    profiles: ["worker-jobs"]
+    image: ${PMS_APP_IMAGE:-pms-app:prod}
+    pull_policy: if_not_present
+    container_name: pms-prod-worker
+    command: python -m src.workers.crawl_runner --query bluetooth-speaker --mode mock
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
+      DB_URL: ${DB_URL:?set DB_URL}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+      SEARCH_ENDPOINT: ${SEARCH_ENDPOINT:?set SEARCH_ENDPOINT}
+      QDRANT_HOST: ${QDRANT_HOST:-qdrant}
+      QDRANT_PORT: ${QDRANT_PORT:-6333}
+      QDRANT_URL: ${QDRANT_URL:-}
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      LLM_OLLAMA_ENDPOINT: ${LLM_OLLAMA_ENDPOINT:-http://ollama:11434}
+      SEC_SECRET_KEY: ${SEC_SECRET_KEY:?set SEC_SECRET_KEY}
+    volumes:
+      - ${PMS_CACHE_ROOT:-/data/pms/cache}:/app/.cache
+      - ${PMS_ARTIFACTS_ROOT:-/data/pms/artifacts}:/app/artifacts
+    restart: unless-stopped
+
+  ollama:
+    profiles: ["gpu-private-llm"]
+    image: ollama/ollama
+    pull_policy: if_not_present
+    container_name: pms-prod-ollama
+    gpus: all
+    ports:
+      - "${OLLAMA_HOST_PORT:-11434}:11434"
+    volumes:
+      - ${PMS_OLLAMA_ROOT:-/data/pms/ollama}:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  default:
+    name: pms-network

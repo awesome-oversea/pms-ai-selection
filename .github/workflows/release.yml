@@ -1,0 +1,44 @@
+name: release-pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Release target environment
+        required: true
+        type: choice
+        options:
+          - test
+          - preprod
+          - prod
+      version:
+        description: Release version
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install package and dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Run release quality gates
+        run: python scripts/release_quality_gates.py all
+
+      - name: Deploy release
+        run: python scripts/release_deploy.py --target ${{ inputs.target }} --version ${{ inputs.version }}
+
+      - name: Rollback hint
+        if: failure()
+        run: python scripts/release_rollback.py --target ${{ inputs.target }} --reason workflow_failed

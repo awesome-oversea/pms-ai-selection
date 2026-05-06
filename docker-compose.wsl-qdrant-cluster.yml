@@ -1,0 +1,84 @@
+services:
+  qdrant-node-1:
+    image: qdrant/qdrant:v1.15.3
+    container_name: pms-qdrant-node-1-wsl
+    hostname: qdrant-node-1
+    command:
+      - ./qdrant
+      - --uri
+      - http://qdrant-node-1:6335
+    environment:
+      QDRANT__CLUSTER__ENABLED: "true"
+    ports:
+      - "16333:6333"
+      - "16334:6334"
+      - "16335:6335"
+    volumes:
+      - qdrant_node_1_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:6333/collections >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  qdrant-node-2:
+    image: qdrant/qdrant:v1.15.3
+    container_name: pms-qdrant-node-2-wsl
+    hostname: qdrant-node-2
+    depends_on:
+      qdrant-node-1:
+        condition: service_healthy
+    command:
+      - ./qdrant
+      - --bootstrap
+      - http://qdrant-node-1:6335
+      - --uri
+      - http://qdrant-node-2:6335
+    environment:
+      QDRANT__CLUSTER__ENABLED: "true"
+    ports:
+      - "16433:6333"
+      - "16434:6334"
+      - "16435:6335"
+    volumes:
+      - qdrant_node_2_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:6333/collections >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  qdrant-node-3:
+    image: qdrant/qdrant:v1.15.3
+    container_name: pms-qdrant-node-3-wsl
+    hostname: qdrant-node-3
+    depends_on:
+      qdrant-node-1:
+        condition: service_healthy
+    command:
+      - ./qdrant
+      - --bootstrap
+      - http://qdrant-node-1:6335
+      - --uri
+      - http://qdrant-node-3:6335
+    environment:
+      QDRANT__CLUSTER__ENABLED: "true"
+    ports:
+      - "16533:6333"
+      - "16534:6334"
+      - "16535:6335"
+    volumes:
+      - qdrant_node_3_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:6333/collections >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  qdrant_node_1_data:
+  qdrant_node_2_data:
+  qdrant_node_3_data:

@@ -1,0 +1,56 @@
+global:
+  namespace: fms-system
+
+image:
+  repository: registry.example.com/fms/pms-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 3
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: pms.example.com
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2000m"
+    memory: "2Gi"
+
+env:
+  APP_ENVIRONMENT: production
+  APP_DEBUG: "false"
+  APP_LOG_LEVEL: INFO
+  APP_API_PREFIX: /api/v1
+  DB_URL: postgresql+asyncpg://fms:REPLACE_ME_DB_PASSWORD@fms-postgres.fms-system.svc.cluster.local:5432/fms
+  REDIS_URL: redis://fms-redis.fms-system.svc.cluster.local:6379/0
+  KAFKA_BOOTSTRAP_SERVERS: fms-kafka.fms-system.svc.cluster.local:9092
+  SEARCH_ENABLED: "true"
+  SEARCH_BACKEND: opensearch
+  SEARCH_ENDPOINT: http://fms-opensearch.fms-system.svc.cluster.local:9201
+  QDRANT_HOST: fms-qdrant.fms-system.svc.cluster.local
+  QDRANT_PORT: "6333"
+  NEO4J_ENABLED: "false"
+  NEO4J_URI: bolt://fms-neo4j.fms-system.svc.cluster.local:7687
+  LLM_OLLAMA_ENDPOINT: http://fms-ollama.fms-system.svc.cluster.local:11434
+  REPORT_CENTER_STATE_PATH: /app/artifacts/report_center/prod-state.json
+
+secretRefs:
+  - name: fms-prod-secrets
+
+dependencies:
+  postgres: fms-postgres.fms-system.svc.cluster.local:5432
+  redis: fms-redis.fms-system.svc.cluster.local:6379
+  kafka: fms-kafka.fms-system.svc.cluster.local:9092
+  opensearch: http://fms-opensearch.fms-system.svc.cluster.local:9201
+  qdrant: fms-qdrant.fms-system.svc.cluster.local:6333
+  neo4j: bolt://fms-neo4j.fms-system.svc.cluster.local:7687
+  ollama: http://fms-ollama.fms-system.svc.cluster.local:11434

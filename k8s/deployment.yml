@@ -1,0 +1,217 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pms-system
+  labels:
+    app.kubernetes.io/name: pms
+    app.kubernetes.io/component: system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pms-config
+  namespace: pms-system
+data:
+  APP_ENVIRONMENT: "production"
+  APP_DEBUG: "false"
+  APP_LOG_LEVEL: "INFO"
+  APP_API_PREFIX: "/api/v1"
+  DB_URL: "postgresql+asyncpg://pms:pms_password@pms-pg-primary-svc.pms-system:5432/pms_db"
+  REDIS_URL: "redis://pms-redis-master-svc.pms-system:6379/0"
+  KAFKA_BOOTSTRAP_SERVERS: "pms-kafka-svc.pms-system:9092"
+  LLM_VLLM_ENDPOINT: "http://pms-vllm-svc.agent:8000/v1"
+  LLM_TRITON_ENDPOINT: "http://pms-triton-svc.inference:8000"
+  QDRANT_HOST: "qdrant"
+  QDRANT_PORT: "6333"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pms-secrets
+  namespace: pms-system
+type: Opaque
+stringData:
+  SEC_SECRET_KEY: "replace-with-a-strong-random-secret-key-0123456789abcdef"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-app
+  namespace: pms-system
+  labels:
+    app.kubernetes.io/name: pms
+    app.kubernetes.io/component: api-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pms
+      app.kubernetes.io/component: api-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pms
+        app.kubernetes.io/component: api-server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: pms-app-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: pms-api
+          image: ${REGISTRY}/pms-ai-selection:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: pms-config
+            - secretRef:
+                name: pms-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: logs
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: pms
+                    app.kubernetes.io/component: api-server
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-app-svc
+  namespace: pms-system
+  labels:
+    app.kubernetes.io/name: pms
+    app.kubernetes.io/component: api-server
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: pms
+    app.kubernetes.io/component: api-server
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pms-ingress
+  namespace: pms-system
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.pms.example.com
+      secretName: pms-ingress-tls
+  rules:
+    - host: api.pms.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pms-app-svc
+                port:
+                  number: 8000
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pms-hpa
+  namespace: pms-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pms-app
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pms-app-sa
+  namespace: pms-system
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pms-app-role
+  namespace: pms-system
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pms-app-rb
+  namespace: pms-system
+subjects:
+  - kind: ServiceAccount
+    name: pms-app-sa
+roleRef:
+  kind: Role
+  name: pms-app-role
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,168 @@
+version: "3.9"
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: pms-local-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_4LW_COMMANDS_WHITELIST: srvr,ruok,stat,mntr,conf,isro
+    ports:
+      - "12181:2181"
+    volumes:
+      - local_zookeeper_data:/var/lib/zookeeper/data
+      - local_zookeeper_log:/var/lib/zookeeper/log
+    networks:
+      default:
+      pms-network:
+        aliases:
+          - pms-local-zookeeper
+          - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc localhost 2181 | grep Mode"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: pms-local-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: pms-local-zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://pms-local-kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CREATE_TOPICS: "pms-data-collection:3:1,pms-agent-event:3:1,raw_amazon:3:1,raw_tiktok:3:1,raw_trends:3:1,raw_1688:3:1,raw_news:3:1,cdc.oms:1:1,cdc.crm:1:1,pms-connect-configs:1:1,pms-connect-offsets:1:1,pms-connect-status:1:1"
+    networks:
+      default:
+      fms_default:
+        aliases:
+          - pms-local-kafka
+          - kafka
+      pms-network:
+        aliases:
+          - pms-local-kafka
+          - kafka
+    ports:
+      - "9092:9092"
+    volumes:
+      - local_kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'echo > /dev/tcp/127.0.0.1/9092'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: pms-local-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        for topic in pms-data-collection pms-agent-event raw_amazon raw_tiktok raw_trends raw_1688 raw_news cdc.oms cdc.crm; do
+          kafka-topics --bootstrap-server pms-local-kafka:29092 --create --if-not-exists --topic $$topic --partitions 3 --replication-factor 1
+        done
+        for topic in pms-connect-configs pms-connect-offsets pms-connect-status; do
+          if kafka-topics --bootstrap-server pms-local-kafka:29092 --describe --topic $$topic 2>/dev/null | grep -q 'PartitionCount:1'; then
+            :
+          else
+            kafka-topics --bootstrap-server pms-local-kafka:29092 --delete --if-exists --topic $$topic || true
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if kafka-topics --bootstrap-server pms-local-kafka:29092 --describe --topic $$topic >/dev/null 2>&1; then
+                sleep 1
+              else
+                break
+              fi
+            done
+            kafka-topics --bootstrap-server pms-local-kafka:29092 --create --if-not-exists --topic $$topic --partitions 1 --replication-factor 1 --config cleanup.policy=compact
+          fi
+          kafka-configs --bootstrap-server pms-local-kafka:29092 --alter --entity-type topics --entity-name $$topic --add-config cleanup.policy=compact
+        done
+    restart: "no"
+
+  kafka-connect:
+    image: debezium/connect:2.7.3.Final
+    container_name: pms-local-kafka-connect
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      BOOTSTRAP_SERVERS: pms-local-kafka:29092
+      GROUP_ID: pms-connect-cluster
+      CONFIG_STORAGE_TOPIC: pms-connect-configs
+      OFFSET_STORAGE_TOPIC: pms-connect-offsets
+      STATUS_STORAGE_TOPIC: pms-connect-status
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      PLUGIN_PATH: /kafka/connect,/debezium-connector-postgres
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      default:
+      pms-network:
+        aliases:
+          - pms-local-kafka-connect
+          - kafka-connect
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/connectors >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  debezium-init:
+    image: curlimages/curl:8.8.0
+    container_name: pms-local-debezium-init
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pms_dev_2024}
+    depends_on:
+      kafka-connect:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        curl -fsS -X PUT http://kafka-connect:8083/connectors/oms-debezium-connector/config -H 'Content-Type: application/json' -d "{\"connector.class\":\"io.debezium.connector.postgresql.PostgresConnector\",\"database.hostname\":\"postgres\",\"database.port\":\"5432\",\"database.user\":\"pms\",\"database.password\":\"$${POSTGRES_PASSWORD}\",\"database.dbname\":\"pms_db\",\"topic.prefix\":\"cdc.oms\",\"table.include.list\":\"public.orders,public.order_items,public.refunds\",\"plugin.name\":\"pgoutput\",\"tombstones.on.delete\":\"false\",\"include.schema.changes\":\"false\",\"value.converter\":\"org.apache.kafka.connect.json.JsonConverter\",\"value.converter.schemas.enable\":\"false\",\"key.converter\":\"org.apache.kafka.connect.json.JsonConverter\",\"key.converter.schemas.enable\":\"false\"}" && \
+        curl -fsS -X PUT http://kafka-connect:8083/connectors/crm-debezium-connector/config -H 'Content-Type: application/json' -d "{\"connector.class\":\"io.debezium.connector.postgresql.PostgresConnector\",\"database.hostname\":\"postgres\",\"database.port\":\"5432\",\"database.user\":\"pms\",\"database.password\":\"$${POSTGRES_PASSWORD}\",\"database.dbname\":\"pms_db\",\"topic.prefix\":\"cdc.crm\",\"table.include.list\":\"public.reviews,public.complaints,public.customer_feedbacks\",\"plugin.name\":\"pgoutput\",\"tombstones.on.delete\":\"false\",\"include.schema.changes\":\"false\",\"value.converter\":\"org.apache.kafka.connect.json.JsonConverter\",\"value.converter.schemas.enable\":\"false\",\"key.converter\":\"org.apache.kafka.connect.json.JsonConverter\",\"key.converter.schemas.enable\":\"false\"}"
+    networks:
+      - default
+      - pms-network
+    restart: "no"
+
+networks:
+  default:
+    name: pms-local-kafka-network
+  fms_default:
+    external: true
+    name: fms_default
+  pms-network:
+    external: true
+    name: pms-network
+
+volumes:
+  local_zookeeper_data:
+  local_zookeeper_log:
+  local_kafka_data:

@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI选品系统 - 仪表盘</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 0;
+        }
+        .card-body {
+            min-height: 300px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-primary {
+            border-left: 4px solid #007bff;
+        }
+        .stat-success {
+            border-left: 4px solid #28a745;
+        }
+        .stat-warning {
+            border-left: 4px solid #ffc107;
+        }
+        .stat-danger {
+            border-left: 4px solid #dc3545;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .filter-group label {
+            font-weight: 500;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0069d9;
+        }
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid #6c757d;
+            color: #6c757d;
+        }
+        .btn-outline:hover {
+            background-color: #f8f9fa;
+        }
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            color: #6c757d;
+        }
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .alert-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">AI选品系统</div>
+        <div class="nav-links">
+            <a href="/dashboard" class="active">仪表盘</a>
+            <a href="/workbench/selection">选品工作台</a>
+            <a href="/selection">旧版任务页</a>
+            <a href="/docs">API文档</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>AI选品系统仪表盘</h1>
+            <p class="subtitle">实时监控选品绩效和系统状态</p>
+        </div>
+
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label for="timeWindow">时间窗口:</label>
+                <select id="timeWindow">
+                    <option value="7d">近7天</option>
+                    <option value="30d">近30天</option>
+                    <option value="90d">近90天</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="dataSource">数据来源:</label>
+                <select id="dataSource">
+                    <option value="auto">自动</option>
+                    <option value="services">服务</option>
+                    <option value="artifacts">本地数据</option>
+                </select>
+            </div>
+            <button id="refreshBtn" class="btn btn-outline">刷新数据</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card stat-primary">
+                <div class="stat-value" id="totalTasks">0</div>
+                <div class="stat-label">总任务数</div>
+            </div>
+            <div class="stat-card stat-success">
+                <div class="stat-value" id="completedTasks">0</div>
+                <div class="stat-label">已完成任务</div>
+            </div>
+            <div class="stat-card stat-warning">
+                <div class="stat-value" id="runningTasks">0</div>
+                <div class="stat-label">运行中任务</div>
+            </div>
+            <div class="stat-card stat-danger">
+                <div class="stat-value" id="failedTasks">0</div>
+                <div class="stat-label">失败任务</div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">趋势机会</h3>
+                    <span class="badge">实时</span>
+                </div>
+                <div class="card-body">
+                    <div id="trendChart" style="width: 100%; height: 300px;"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">利润/ROI</h3>
+                    <span class="badge">实时</span>
+                </div>
+                <div class="card-body">
+                    <div id="profitChart" style="width: 100%; height: 300px;"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">库存/供应风险</h3>
+                    <span class="badge">实时</span>
+                </div>
+                <div class="card-body">
+                    <div id="riskChart" style="width: 100%; height: 300px;"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">执行闭环进度</h3>
+                    <span class="badge">实时</span>
+                </div>
+                <div class="card-body">
+                    <div id="executionChart" style="width: 100%; height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">系统状态</h3>
+                <button id="systemStatusBtn" class="btn btn-outline btn-sm">查看详情</button>
+            </div>
+            <div class="card-body">
+                <div id="systemStatus" class="loading">加载中...</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">最近报告</h3>
+                <button id="generateReportBtn" class="btn btn-primary btn-sm">生成报告</button>
+            </div>
+            <div class="card-body">
+                <div id="reportList" class="loading">加载中...</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = '/api/v1';
+        const TOKEN_KEY = 'pms_workbench_token';
+
+        function getToken() {
+            return localStorage.getItem(TOKEN_KEY);
+        }
+
+        function authHeaders() {
+            const token = getToken();
+            return token ? { Authorization: `Bearer ${token}` } : {};
+        }
+
+        async function apiRequest(path, options = {}) {
+            const response = await fetch(`${API_BASE}${path}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...authHeaders(),
+                    ...(options.headers || {}),
+                },
+                ...options,
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || data.detail || '请求失败');
+            }
+            return data.data || data;
+        }
+
+        async function loadDashboard() {
+            try {
+                const timeWindow = document.getElementById('timeWindow').value;
+                const dataSource = document.getElementById('dataSource').value;
+                const dashboardData = await apiRequest(`/dashboard/selection-overview?source=${dataSource}`);
+                
+                // 更新统计数据
+                document.getElementById('totalTasks').textContent = dashboardData.summary.bi_asset_count || 0;
+                document.getElementById('completedTasks').textContent = dashboardData.summary.report_count || 0;
+                document.getElementById('runningTasks').textContent = 0;
+                document.getElementById('failedTasks').textContent = 0;
+                
+                // 渲染趋势图表
+                const trendChart = echarts.init(document.getElementById('trendChart'));
+                trendChart.setOption({
+                    title: {
+                        text: '趋势机会',
+                        left: 'center'
+                    },
+                    tooltip: {
+                        trigger: 'axis'
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: dashboardData.charts.trend_chart.xAxis
+                    },
+                    yAxis: {
+                        type: 'value'
+                    },
+                    series: [{
+                        data: dashboardData.charts.trend_chart.series,
+                        type: 'line',
+                        smooth: true,
+                        lineStyle: {
+                            color: '#007bff'
+                        },
+                        areaStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: 'rgba(0, 123, 255, 0.3)' },
+                                { offset: 1, color: 'rgba(0, 123, 255, 0.1)' }
+                            ])
+                        }
+                    }]
+                });
+                
+                // 渲染利润图表
+                const profitChart = echarts.init(document.getElementById('profitChart'));
+                profitChart.setOption({
+                    title: {
+                        text: '利润 / ROI',
+                        left: 'center'
+                    },
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'shadow'
+                        }
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: dashboardData.charts.profit_chart.xAxis
+                    },
+                    yAxis: {
+                        type: 'value'
+                    },
+                    series: [{
+                        data: dashboardData.charts.profit_chart.series,
+                        type: 'bar',
+                        itemStyle: {
+                            color: function(params) {
+                                const colors = ['#28a745', '#ffc107', '#007bff'];
+                                return colors[params.dataIndex];
+                            }
+                        }
+                    }]
+                });
+                
+                // 渲染风险图表
+                const riskChart = echarts.init(document.getElementById('riskChart'));
+                riskChart.setOption({
+                    title: {
+                        text: '库存 / 供应风险',
+                        left: 'center'
+                    },
+                    tooltip: {
+                        trigger: 'item'
+                    },
+                    legend: {
+                        orient: 'vertical',
+                        left: 'left'
+                    },
+                    series: [{
+                        name: '风险分布',
+                        type: 'pie',
+                        radius: '60%',
+                        data: dashboardData.charts.risk_chart.items,
+                        emphasis: {
+                            itemStyle: {
+                                shadowBlur: 10,
+                                shadowOffsetX: 0,
+                                shadowColor: 'rgba(0, 0, 0, 0.5)'
+                            }
+                        }
+                    }]
+                });
+                
+                // 渲染执行进度图表
+                const executionChart = echarts.init(document.getElementById('executionChart'));
+                executionChart.setOption({
+                    title: {
+                        text: '执行闭环进度',
+                        left: 'center'
+                    },
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'shadow'
+                        }
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '3%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'value',
+                        max: 100
+                    },
+                    yAxis: {
+                        type: 'category',
+                        data: dashboardData.charts.execution_chart.items.map(item => item.name)
+                    },
+                    series: [{
+                        name: '完成度',
+                        type: 'bar',
+                        data: dashboardData.charts.execution_chart.items.map(item => item.value),
+                        itemStyle: {
+                            color: function(params) {
+                                const value = params.value;
+                                if (value >= 80) return '#28a745';
+                                if (value >= 50) return '#ffc107';
+                                return '#dc3545';
+                            }
+                        }
+                    }]
+                });
+                
+                // 加载系统状态
+                loadSystemStatus();
+                
+                // 加载报告列表
+                loadReports();
+                
+            } catch (error) {
+                console.error('加载仪表盘失败:', error);
+                alert('加载仪表盘失败: ' + error.message);
+            }
+        }
+
+        async function loadSystemStatus() {
+            try {
+                const systemStatus = await apiRequest('/system/info');
+                const statusElement = document.getElementById('systemStatus');
+                
+                let statusHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                        <div><strong>系统状态:</strong> ${systemStatus.status}</div>
+                        <div><strong>版本:</strong> ${systemStatus.version}</div>
+                        <div><strong>环境:</strong> ${systemStatus.environment}</div>
+                        <div><strong>启动时间:</strong> ${systemStatus.started_at}</div>
+                        <div><strong>API状态:</strong> ${systemStatus.api_ready ? '就绪' : '未就绪'}</div>
+                        <div><strong>数据库:</strong> ${systemStatus.db_ready ? '连接正常' : '连接失败'}</div>
+                    </div>
+                `;
+                
+                if (systemStatus.services) {
+                    statusHTML += `
+                        <h4 style="margin-top: 1rem;">服务状态</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    `;
+                    
+                    for (const [service, status] of Object.entries(systemStatus.services)) {
+                        const statusClass = status.ready ? 'text-success' : 'text-danger';
+                        statusHTML += `<div><strong>${service}:</strong> <span class="${statusClass}">${status.ready ? '正常' : '异常'}</span></div>`;
+                    }
+                    
+                    statusHTML += `</div>`;
+                }
+                
+                statusElement.innerHTML = statusHTML;
+            } catch (error) {
+                document.getElementById('systemStatus').innerHTML = `<div class="alert alert-warning">加载系统状态失败: ${error.message}</div>`;
+            }
+        }
+
+        async function loadReports() {
+            try {
+                const reports = await apiRequest('/reports');
+                const reportList = document.getElementById('reportList');
+                
+                if (!reports || !reports.length) {
+                    reportList.innerHTML = '<div class="text-center text-muted">暂无报告</div>';
+                    return;
+                }
+                
+                reportList.innerHTML = `
+                    <table class="data-table" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>报告ID</th>
+                                <th>标题</th>
+                                <th>生成时间</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${reports.map(report => `
+                                <tr>
+                                    <td>${report.id}</td>
+                                    <td>${report.title}</td>
+                                    <td>${report.created_at}</td>
+                                    <td>${report.status}</td>
+                                    <td>
+                                        <button class="btn btn-outline btn-sm" onclick="downloadReport('${report.id}')">下载</button>
+                                        <button class="btn btn-outline btn-sm" onclick="shareReport('${report.id}')">分享</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                document.getElementById('reportList').innerHTML = `<div class="alert alert-warning">加载报告列表失败: ${error.message}</div>`;
+            }
+        }
+
+        async function generateReport() {
+            try {
+                const report = await apiRequest('/reports/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title: '选品系统性能报告',
+                        type: 'dashboard',
+                        time_range: '30d'
+                    })
+                });
+                alert('报告生成成功！');
+                loadReports();
+            } catch (error) {
+                alert('生成报告失败: ' + error.message);
+            }
+        }
+
+        function downloadReport(reportId) {
+            window.open(`${API_BASE}/reports/${reportId}/download`, '_blank');
+        }
+
+        async function shareReport(reportId) {
+            try {
+                const result = await apiRequest(`/reports/${reportId}/share`, {
+                    method: 'POST',
+                    body: JSON.stringify({})
+                });
+                alert(`报告分享成功！分享链接: ${result.share_url}`);
+            } catch (error) {
+                alert('分享报告失败: ' + error.message);
+            }
+        }
+
+        // 响应式处理
+        function resizeCharts() {
+            setTimeout(() => {
+                echarts.getInstanceByDom(document.getElementById('trendChart'))?.resize();
+                echarts.getInstanceByDom(document.getElementById('profitChart'))?.resize();
+                echarts.getInstanceByDom(document.getElementById('riskChart'))?.resize();
+                echarts.getInstanceByDom(document.getElementById('executionChart'))?.resize();
+            }, 100);
+        }
+
+        window.addEventListener('resize', resizeCharts);
+
+        // 事件监听
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+            document.getElementById('timeWindow').addEventListener('change', loadDashboard);
+            document.getElementById('dataSource').addEventListener('change', loadDashboard);
+            document.getElementById('generateReportBtn').addEventListener('click', generateReport);
+            document.getElementById('systemStatusBtn').addEventListener('click', loadSystemStatus);
+            
+            // 初始化加载
+            loadDashboard();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+consumers:
+  - username: bff-client
+    keyauth_credentials:
+      - key: bff-demo-key
