@@ -1,436 +1,464 @@
-# 跨境电商 AI 选品系统 (PMS)
+# 🌐 跨境电商 AI 选品决策系统
 
-> **定位**：面向跨境电商场景的 AI 选品决策与执行中枢，覆盖从数据采集、市场洞察、产品规划、商业化评估到报告交付的全链路智能选品流程。
->
-> **设计基准**：[跨境电商AI选品系统PMS—架构与业务设计文档.md](跨境电商AI选品系统PMS—%20架构与业务设计文档.md) · [跨境电商AI选品系统---分层架构与数据流协作.md](跨境电商AI选品系统---分层架构与数据流协作.md)
+### 企业级 AI 选品决策中枢 · 全链路智能选品平台
+
+**PMS = AI 决策建议 · ERP = 领域规则 + 执行 + 审批**
+
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square\&logo=python\&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat-square\&logo=fastapi\&logoColor=white)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square\&logo=next.js\&logoColor=white)](https://nextjs.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-4169E1?style=flat-square\&logo=postgresql\&logoColor=white)](https://postgresql.org)
+[![Kafka](https://img.shields.io/badge/Kafka-3.6+-231F20?style=flat-square\&logo=apachekafka\&logoColor=white)](https://kafka.apache.org)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square\&logo=docker\&logoColor=white)](https://docker.com)
+[![K8s](https://img.shields.io/badge/K8s-Ready-326CE5?style=flat-square\&logo=kubernetes\&logoColor=white)](https://kubernetes.io)
+[![License](https://img.shields.io/badge/License-Apache--2.0-green?style=flat-square)](./LICENSE)
+
+[中文](#项目概述) · [English](./README-en.md) · [架构文档](./docs/github/ARCHITECTURE.md) · [快速开始](#快速开始) · [截图展示](#截图展示)
+
+</div>
 
 ***
 
-## 1. 系统概述
+## 项目概述
 
-本系统是一个企业级跨境电商 AI 选品平台，核心能力包括：
+面向跨境电商的**企业级 AI 选品决策中枢**，覆盖从数据采集、市场洞察、产品规划、商业化评估到 ERP 执行闭环的全链路智能选品流程。
 
-- **Multi-Agent 智能编排**：5 大专业 Agent（数据采集 → 市场洞察 → 产品规划 → 商业化评估 → 报告生成）协同工作，模拟专家团队完成选品全流程
-- **多源数据融合**：Amazon / TikTok / Google Trends / 1688 / 媒体资讯 / 爬虫采集，结合内部 ERP（OMS / WMS / SCM / CRM / FMS / BI）数据形成闭环
-- **AI 中台服务化**：LLM 智能路由、RAG 混合检索、GraphRAG 知识图谱、Embedding 向量化，统一能力层供上层 Agent 调用
-- **企业级平台治理**：多租户隔离、RBAC 权限、审计日志、数据脱敏、IP 白名单、Prompt 注入防护
-- **多端交付**：Next.js 工作台、钉钉/企业微信/邮件通知、报告导出
+### 核心差异化
 
-***
-
-## 2. 系统架构
-
-### 2.1 分层架构
+大多数 AI Demo 止步于模型预测。本系统演示如何将 **AI 建议嵌入真实业务流程**：
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        用户接入层                                │
-│   Web浏览器(Next.js 14) │ 移动端APP │ 企微/钉钉机器人 │ 数据大屏 │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│                    网关层 (Kong Gateway)                         │
-│   认证授权(JWT/OAuth2) │ 限流熔断 │ 路由灰度 │ 审计 │ IP白名单  │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│              UI层 (Next.js 14 + Vue3 + ElementUI Plus)          │
-│  选品工作台 │ Agent监控面板 │ RAG知识库管理 │ 报告中心 │ 系统管理  │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│           API层 (FastAPI 异步RESTful + WebSocket)                │
-│  /selection │ /agents │ /knowledge │ /reports │ /integration    │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│        AI Agent 编排层 (LangGraph + AutoGen + CrewAI + Dify)    │
-│  SelectionMaster(总控) → 数据采集 → 市场洞察 → 产品规划 → 商业化 │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│                   AI 中台 (统一能力层)                            │
-│  llm-service │ rag-service │ agent-service │ embedding-service  │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│              LLM 模型层 (轻量本地 + 商业，场景匹配)               │
-│ Qwen2.5-1.5B(Ollama)  │ Qwen3.5-2B │ CPU本地模型 │ 商业API      │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────┐
-│                    数据层                                        │
-│  PostgreSQL │ Redis │ Qdrant │ OpenSearch │ Kafka │ 数据湖       │
-└─────────────────────────────────────────────────────────────────┘
+趋势信号 → AI GO/NO-GO 决策 → 人工审批 → ERP 执行 → 利润反馈 → 自进化闭环
 ```
 
-### 2.2 业务闭环
+### 五大架构能力
 
-```
-外部数据源(Amazon/TikTok/1688/Google Trends/爬虫/RSS)
-        │
-        ▼
-  数据采集与接入层 (API适配器 + 爬虫引擎 + RSS订阅器)
-        │
-        ├── 实时/批量 ──► Kafka / 数据湖
-        │
-内部ERP(CDC/API) ──► Kafka / 数据湖
-  OMS │ WMS │ SCM │ CRM │ FMS │ BI
-        │
-        ▼
-  数据处理层 (Flink/Spark)
-        │
-        ▼
-  特征库 / 向量库 / 知识库
-        │
-        ▼
-  Agent编排层 (数据采集→市场洞察→产品规划→商业化→报告)
-        │
-        ▼
-  选品建议 / 风险结论 / 利润测算 / 报告
-        │
-        ▼
-  运营采纳 → SCM创建采购单 / WMS预留库容 / OMS创建Listing
-        │
-        ▼
-  执行结果回流 → 自进化闭环
-```
+| 架构域       | 核心能力                       | 技术实现                                       |
+| --------- | -------------------------- | ------------------------------------------ |
+| **AI 架构** | 5 Agent 协同编排 + 17 状态建议生命周期 | LangGraph 状态机 + 建议池模式 + 人工干预               |
+| **业务架构**  | ERP 14 域集成 + 数据主权矩阵        | 建议池模式（PMS 建议 → ERP 审批 → 执行）                |
+| **数据架构**  | 混合检索 + 向量 + 知识图谱 + 流处理     | Qdrant + OpenSearch + GraphRAG + Kafka CDC |
+| **安全架构**  | 10 维数据权限 + 审计上下文 + 写入边界    | RBAC + 租户隔离 + 数据脱敏 + Prompt 注入防护           |
+| **前端架构**  | 15 页面多角色工作台 + 实时流          | Next.js 14 + WebSocket SSE + ECharts       |
 
 ***
 
-## 3. 核心模块
+## 系统架构
 
-### 3.1 AI Agent 编排层
+### 架构全景图
 
-| Agent               | 职责                      | 数据来源                                | 关键输出                       |
-| ------------------- | ----------------------- | ----------------------------------- | -------------------------- |
-| **SelectionMaster** | 总控协调，4阶段状态机编排           | 下游Agent结果                           | 决策输出（Go/No-Go/Conditional） |
-| **数据采集Agent**       | 多源数据采集与质量检查             | Amazon/TikTok/1688/Google Trends/爬虫 | 标准化数据集 + 质量报告              |
-| **市场洞察Agent**       | TAM/SAM/SOM估算、竞品格局、趋势识别 | 数据湖/特征库/OMS历史销量                     | 机会评分 + 趋势信号                |
-| **产品规划Agent**       | 多模态分析、评论聚类、差异化定位        | Amazon评论/TikTok视频/CRM评价/RAG         | 产品规格 + 差异化评分               |
-| **商业化Agent**        | 利润测算、动态定价、Go/No-Go决策    | 1688报价/FMS成本/SCM供应商/OMS价格弹性         | 利润测算 + 定价策略                |
-| **风险评估Agent**       | 专利检索、媒体情感、合规检查          | GraphRAG/CRM/专利库                    | 风险清单 + 合规结论                |
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                             展示层                                       │
+│  Next.js 14 (App Router) │ 移动端 PWA │ 钉钉/企微机器人 │ 数据大屏       │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────▼───────────────────────────────────────┐
+│                       API 网关 (Kong)                                    │
+│  JWT/OAuth2 认证 │ 限流 │ 熔断 │ 金丝雀发布 │ 审计 │ WAF                 │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────▼───────────────────────────────────────┐
+│                      BFF 层 (FastAPI Async)                              │
+│  /selection │ /agents │ /knowledge │ /reports │ /erp-domains │ /bff      │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────▼───────────────────────────────────────┐
+│                   服务层（业务编排）                                      │
+│  SelectionService │ SuggestionService │ ExecutionTrackingService │ ...   │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────▼───────────────────────────────────────┐
+│              AI Agent 编排层 (LangGraph + 状态机)                         │
+│  SelectionMaster → DataCollection → MarketInsight → ProductPlanner      │
+│                                    → Commercialization → RiskAssessment  │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────▼───────────────────────────────────────┐
+│                       AI 中台                                            │
+│  LLM 网关 (多模型路由) │ RAG (混合检索 + 重排)                            │
+│  GraphRAG (知识图谱) │ 向量服务 (BGE + 批量 5K QPS)                      │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────▼───────────────────────────────────────┐
+│                  ERP 14 域集成层                                         │
+│  IAM │ PDM │ SOM │ ADS │ OMS │ SCM │ WMS │ FBA │ TMS │ CRM │ FMS │ BI  │
+│  ──────────── 建议池模式：PMS→建议→ERP→审批→执行 ────────────────────────│
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────▼───────────────────────────────────────┐
+│                    数据与基础设施层                                       │
+│  PostgreSQL │ Redis │ Qdrant │ OpenSearch │ Kafka │ MinIO │ 数据湖       │
+└──────────────────────────────────────────────────────────────────────────┘
+```
 
-### 3.2 AI 中台
+### 业务闭环
 
-| 服务                    | 职责                       | 技术实现                                    |
-| --------------------- | ------------------------ | --------------------------------------- |
-| **llm-service**       | 多模型路由、负载均衡、成本优化、降级策略     | LLM Gateway + Ollama + 熔断器              |
-| **rag-service**       | 混合检索（向量+关键词）、Rerank精排、缓存 | Qdrant + OpenSearch + bge-reranker-base |
-| **agent-service**     | Agent生命周期管理、任务调度、人工干预    | 异步任务队列 + 断点调试                           |
-| **embedding-service** | BGE向量化、批量处理、增量更新         | Qdrant + 批量5000 QPS                     |
+```mermaid
+flowchart LR
+    A["外部信号<br/>Amazon/TikTok/1688/Google Trends"] --> B["AI 选品<br/>GO/NO-GO 决策"]
+    B --> C["建议池<br/>17 状态生命周期"]
+    C --> D["人工审批<br/>三阶段审核"]
+    D --> E["ERP 执行<br/>SCM/WMS/OMS"]
+    E --> F["利润反馈<br/>CRM/FMS/BI"]
+    F --> G["自进化<br/>重评分 + 特征更新"]
+    G --> B
+```
 
-### 3.3 ERP 集成
+### 建议池模式
 
-| 系统      | 核心数据               | 交互方式        |
-| ------- | ------------------ | ----------- |
-| **OMS** | 订单明细、销量、退款记录、促销活动  | API + CDC推送 |
-| **WMS** | 实时库存、库龄、周转率、库容利用率  | API         |
-| **SCM** | 供应商信息、采购订单、物流跟踪    | API         |
-| **CRM** | 客户评价、客诉记录、客户画像     | API + CDC推送 |
-| **FMS** | 头程运费、关税、FBA费用、毛利率  | API         |
-| **BI**  | 历史KPI、广告转化率、销售趋势报表 | API         |
+核心架构模式：**PMS 永远不直接写入 ERP 终端业务数据**，而是通过 17 状态生命周期提交建议和草稿：
+
+```
+CREATED → SCORED → SUBMITTED → ACCEPTED → PENDING_APPROVAL → APPROVED
+→ EXECUTING → EXECUTED → MEASURED → REVIEWED
+
+终态：REJECTED | APPROVAL_REJECTED | FAILED | ROLLED_BACK | EXPIRED | DISCARDED
+```
+
+每个状态转换由明确的控制方（PMS / ERP / ERP-BI / System / User）管理，通过 `AuditContext` 实现完整审计追踪。
+
+**控制方归属：**
+
+- `PMS`：CREATED, SCORED, SUBMITTED, REVIEWED
+- `ERP`：ACCEPTED, PENDING\_APPROVAL, APPROVED, EXECUTING, PARTIALLY\_EXECUTED, EXECUTED, FAILED, ROLLED\_BACK
+- `ERP-BI`：MEASURED
+- `系统`：EXPIRED（SUBMITTED 状态 24 小时超时）
+- `用户`：DISCARDED（用户主动取消）
+
+### 数据主权矩阵
+
+| 数据域           | 归属系统 | PMS 权限   | 终端写入 |
+| ------------- | ---- | -------- | ---- |
+| 产品主数据 (PDM)   | ERP  | 读取、建议、草稿 | ❌    |
+| Listing (SOM) | ERP  | 读取、建议、草稿 | ❌    |
+| 采购 (SCM)      | ERP  | 读取、建议、草稿 | ❌    |
+| 订单 (OMS)      | ERP  | 读取、建议    | ❌    |
+| 库存 (WMS/FBA)  | ERP  | 读取、建议    | ❌    |
+| 成本利润 (FMS)    | ERP  | 读取、建议    | ❌    |
+| 选品任务          | PMS  | 读取、写入、管理 | ✅    |
+| AI 建议         | PMS  | 读取、写入、管理 | ✅    |
+| 证据链           | PMS  | 读取、写入    | ✅    |
 
 ***
 
-## 4. 技术栈
+## 核心模块
 
-### 4.1 后端
+### AI Agent 编排
 
-| 领域        | 技术                                              |
-| --------- | ----------------------------------------------- |
-| **Web框架** | FastAPI (Uvicorn) + WebSocket                   |
-| **AI框架**  | LangGraph + AutoGen + CrewAI + Dify + LangChain |
-| **异步任务**  | Celery + Ray Actor                              |
-| **ORM**   | SQLAlchemy 2.0 (async) + Alembic                |
-| **数据校验**  | Pydantic v2                                     |
-| **消息队列**  | Kafka (aiokafka)                                |
-| **流处理**   | Flink / Spark                                   |
+| Agent               | 职责                  | 数据来源                                | 关键输出             |
+| ------------------- | ------------------- | ----------------------------------- | ---------------- |
+| **SelectionMaster** | 编排器，4 阶段状态机         | 下游 Agent 结果                         | GO/NO-GO/有条件通过决策 |
+| **数据采集**            | 多源数据获取 + 质量校验       | Amazon/TikTok/1688/Google Trends/爬虫 | 标准化数据集 + 质量报告    |
+| **市场洞察**            | TAM/SAM/SOM 估算，竞品格局 | 数据湖/特征库/OMS 历史                      | 机会评分 + 趋势信号      |
+| **产品规划**            | 多模态分析，评论聚类          | Amazon 评论/TikTok 视频/CRM/RAG         | 产品规格 + 差异化评分     |
+| **商业化**             | 利润测算，动态定价           | 1688 报价/FMS 成本/SCM 供应商              | 利润预测 + 定价策略      |
+| **风险评估**            | 专利检索，舆情分析，合规        | GraphRAG/CRM/专利库                    | 风险清单 + 合规结论      |
 
-### 4.2 数据存储
+### AI 中台
 
-| 存储                 | 用途               |
-| ------------------ | ---------------- |
-| **PostgreSQL 14+** | 业务数据、用户、租户、审计日志  |
-| **Redis 7.0+**     | 缓存、限流计数器、会话      |
-| **Qdrant**         | 向量检索、Embedding存储 |
-| **OpenSearch**     | 全文检索、日志聚合        |
-| **Kafka**          | 事件流、CDC数据管道      |
-| **MinIO**          | 对象存储、文件上传        |
+| 服务           | 职责                 | 实现方案                                    |
+| ------------ | ------------------ | --------------------------------------- |
+| **LLM 网关**   | 多模型路由、成本优化、熔断降级    | Ollama + Qwen2.5 + 商业 API 降级            |
+| **RAG 服务**   | 混合检索（向量 + 关键词）+ 重排 | Qdrant + OpenSearch + bge-reranker-base |
+| **GraphRAG** | 知识图谱推理             | 实体关系抽取 + 图遍历                            |
+| **向量服务**     | BGE 向量化，批量 5K QPS  | Qdrant + 增量更新                           |
 
-### 4.3 AI / 模型
+### ERP 14 域集成
 
-| 模型                    | 用途                                    |
-| --------------------- | ------------------------------------- |
-| **Qwen2.5-1.5B**      | 文本对话（Ollama GGUF量化）                   |
-| **Qwen2.5-7B**        | 轻量查询                                  |
-| **Phi-3-mini**        | 敏感词过滤 / 降级                            |
-| **BGE-large**         | 文本向量化                                 |
-| **bge-reranker-base** | 检索精排（纯CPU）                            |
-| **Qwen3.5-2B**        | 多模态分析（商品主图 / 视频帧，Ollama `qwen3.5:2b`） |
-| **Whisper tiny**      | 音频转录（纯CPU）                            |
+| 领域            | 核心数据         | PMS 角色     | 可写对象                                           |
+| ------------- | ------------ | ---------- | ---------------------------------------------- |
+| **SCM**       | 供应商、采购单、物流   | 采购建议       | recommendation, draft, risk\_alert             |
+| **WMS**       | 实时库存、周转率     | 库存预测       | recommendation, risk\_alert, insight\_card     |
+| **OMS**       | 订单明细、销量、退款   | 订单风险洞察     | recommendation, risk\_alert, insight\_card     |
+| **CRM**       | 客户评价、投诉      | 客户反馈洞察     | recommendation, risk\_alert, insight\_card     |
+| **FMS**       | 运费、关税、FBA 费用 | 利润风险洞察     | recommendation, risk\_alert, insight\_card     |
+| **BI**        | 历史 KPI、广告转化  | 复盘报告       | insight\_card                                  |
+| **ADS**       | 广告活动、竞价      | 广告优化建议     | recommendation, pending\_action, insight\_card |
+| **FBA**       | FBA 库存、补货    | FBA 补货建议   | recommendation, draft, risk\_alert             |
+| **PDM**       | 产品主数据        | 产品提案       | recommendation, draft, risk\_alert             |
+| **SOM**       | Listing 管理   | Listing 草稿 | recommendation, draft, risk\_alert             |
+| **TMS**       | 物流追踪         | 物流风险建议     | recommendation, risk\_alert, insight\_card     |
+| **IAM**       | 身份、权限        | 权限范围请求     | pending\_action, risk\_alert                   |
+| **SYS**       | 系统配置         | 配置变更请求     | recommendation, pending\_action, risk\_alert   |
+| **Dashboard** | 工作台卡片        | 工作台卡片      | pending\_action, risk\_alert, insight\_card    |
 
-### 4.4 前端
+### 多角色工作台（15 页面）
 
-| 技术                        | 用途              |
-| ------------------------- | --------------- |
-| **Next.js 14**            | App Router, SSR |
-| **Vue3 + ElementUI Plus** | 管理界面            |
-| **ECharts**               | 数据可视化           |
-| **TailwindCSS**           | 样式              |
-| **WebSocket / SSE**       | 实时推送            |
-
-### 4.5 基础设施
-
-| 组件                       | 用途             |
-| ------------------------ | -------------- |
-| **Kong Gateway**         | API网关、认证、限流、灰度 |
-| **Docker / K8s**         | 容器化部署          |
-| **Prometheus + Grafana** | 监控告警           |
-| **Alertmanager**         | 告警通知           |
-| **Istio**                | 服务网格（生产环境）     |
+| 页面                     | 角色     | 业务能力                 |
+| ---------------------- | ------ | -------------------- |
+| `/`                    | 全部     | 蓝图总览 + 服务状态 + 风险雷达   |
+| `/workbench/selection` | 运营     | 任务创建、实时 SSE 流、趋势图、审批 |
+| `/dashboard`           | 管理层    | 利润中心、ROI、风险、闭环进度     |
+| `/manager`             | 经理     | 审批队列、团队 KPI、准确率趋势    |
+| `/analyst`             | 分析师    | 趋势研究、案例评估、报告定制       |
+| `/procurement`         | 采购     | 供应商、SCM/WMS/OMS 执行状态 |
+| `/finance`             | 财务     | 利润、毛利率、ROI、每日 KPI    |
+| `/agents`              | 平台管理   | Agent 拓扑、日志、人工干预     |
+| `/knowledge`           | 知识运营   | 文档上传、检索测试、评估指标       |
+| `/reports`             | 全部     | 报告生成、下载、分享、归档        |
+| `/operations`          | 运维/管理  | 租户、RBAC、审计、配额、发布门禁   |
+| `/competitors`         | 运营     | 竞品监控看板               |
+| `/trends`              | 运营     | 趋势排行看板               |
+| `/kpi`                 | 管理层    | 管理 KPI 看板            |
+| `/models`              | AI 工程师 | 模型调优与评估              |
 
 ***
 
-## 5. 目录结构
+## 技术栈
+
+### 后端
+
+| 领域     | 技术                                              |
+| ------ | ----------------------------------------------- |
+| Web 框架 | FastAPI (Uvicorn) + WebSocket + SSE             |
+| AI 框架  | LangGraph + AutoGen + CrewAI + Dify + LangChain |
+| 异步任务   | Celery + Ray Actor                              |
+| ORM    | SQLAlchemy 2.0 (async) + Alembic 迁移             |
+| 数据校验   | Pydantic v2                                     |
+| 消息队列   | Kafka (aiokafka) + CDC                          |
+| 流处理    | Flink / Spark                                   |
+| 代码质量   | Ruff + mypy --strict                            |
+
+### 数据存储
+
+| 存储             | 用途              |
+| -------------- | --------------- |
+| PostgreSQL 14+ | 业务数据、用户、租户、审计日志 |
+| Redis 7.0+     | 缓存、限流、会话        |
+| Qdrant         | 向量检索、向量存储       |
+| OpenSearch     | 全文检索、日志聚合       |
+| Kafka          | 事件流、CDC 管道      |
+| MinIO          | 对象存储、文件上传       |
+
+### AI / 模型
+
+| 模型                | 用途                   |
+| ----------------- | -------------------- |
+| Qwen2.5-1.5B      | 文本对话（Ollama GGUF 量化） |
+| Qwen3.5-2B        | 多模态分析（产品图片/视频帧）      |
+| BGE-large         | 文本向量化                |
+| bge-reranker-base | 检索重排（CPU）            |
+| Whisper tiny      | 语音转录（CPU）            |
+
+### 前端
+
+| 技术              | 用途                 |
+| --------------- | ------------------ |
+| Next.js 14      | App Router、SSR、PWA |
+| React 18        | 组件框架               |
+| TypeScript      | 类型安全               |
+| TailwindCSS     | 样式                 |
+| ECharts         | 数据可视化              |
+| WebSocket / SSE | 实时推送               |
+
+### 基础设施
+
+| 组件                   | 用途                             |
+| -------------------- | ------------------------------ |
+| Kong 网关              | API 网关、认证、限流、金丝雀发布             |
+| Docker / K8s         | 容器化部署                          |
+| Helm Charts          | 多环境 Overlay（test/preprod/prod） |
+| Prometheus + Grafana | 监控与告警                          |
+| Istio                | 服务网格（生产环境）                     |
+
+***
+
+## 项目结构
 
 ```
 pms/
-├── src/                          # 后端源码
-│   ├── agents/                   # AI Agent 模块
-│   │   ├── selection_master.py   #   总控协调Agent（状态机）
-│   │   ├── data_collection.py    #   数据采集Agent
-│   │   ├── market_insight.py     #   市场洞察Agent
-│   │   ├── product_planner.py    #   产品规划Agent
-│   │   ├── commercial.py         #   商业化Agent
-│   │   ├── human_in_loop.py      #   人工干预接口
-│   │   └── framework_adapter.py  #   多框架适配层
-│   ├── api/v1/endpoints/         # API 路由
-│   │   ├── selection.py          #   选品任务接口
-│   │   ├── agents.py             #   Agent管理接口
-│   │   ├── knowledge.py          #   知识库接口
-│   │   ├── reports.py            #   报告接口
-│   │   ├── integration.py        #   ERP集成接口
-│   │   ├── auth.py               #   认证接口
-│   │   └── ...                   #   其他端点
-│   ├── apps/                     # AI 中台独立服务
-│   │   ├── llm_service.py        #   LLM路由服务
-│   │   ├── rag_service.py        #   RAG检索服务
-│   │   ├── agent_service.py      #   Agent管理服务
-│   │   └── embedding_service.py  #   向量化服务
-│   ├── config/                   # 配置管理
-│   ├── core/                     # 核心基础能力
-│   │   ├── auth.py               #   认证
-│   │   ├── rbac.py               #   RBAC权限
-│   │   ├── tenant.py             #   多租户
-│   │   ├── data_masking.py       #   数据脱敏
-│   │   ├── waf.py                #   IP白名单
-│   │   ├── rate_limit.py         #   限流
-│   │   └── tracing.py            #   链路追踪
-│   ├── crawlers/                 # 爬虫模块
-│   │   └── amazon.py             #   Amazon数据爬虫
-│   ├── infrastructure/           # 基础设施接入
-│   │   ├── database.py           #   PostgreSQL
-│   │   ├── redis.py              #   Redis
-│   │   ├── qdrant.py             #   Qdrant向量库
-│   │   ├── kafka.py              #   Kafka消息队列
-│   │   ├── llm_gateway.py        #   LLM智能路由
-│   │   ├── hybrid_retrieval.py   #   混合检索
-│   │   ├── graph_rag.py          #   GraphRAG
-│   │   ├── oms_client.py         #   OMS客户端
-│   │   ├── wms_client.py         #   WMS客户端
-│   │   ├── scm_client.py         #   SCM客户端
-│   │   ├── crm_client.py         #   CRM客户端
-│   │   ├── fms_client.py         #   FMS客户端
-│   │   ├── bi_client.py          #   BI客户端
-│   │   ├── dingtalk_client.py    #   钉钉通知
-│   │   ├── wechat_client.py      #   企业微信通知
-│   │   ├── email_client.py       #   邮件通知
-│   │   └── ...                   #   其他基础设施
-│   ├── models/                   # ORM / Schema
-│   ├── services/                 # 业务服务层
-│   │   ├── selection_service.py  #   选品任务服务
-│   │   ├── erp_integration_service.py  # ERP集成服务
-│   │   ├── external_signal_service.py  # 外部信号服务
-│   │   ├── channel_delivery_service.py # 多通道交付服务
-│   │   ├── graph_rag_service.py  #   GraphRAG服务
-│   │   └── ...                   #   其他服务
-│   └── main.py                   # 应用入口
-├── frontend/                     # 前端源码
-│   ├── app/                      # Next.js App Router
-│   │   ├── page.tsx              #   首页/选品工作台
-│   │   ├── agents/page.tsx       #   Agent监控面板
-│   │   ├── knowledge/page.tsx    #   RAG知识库管理
-│   │   ├── reports/page.tsx      #   报告中心
-│   │   ├── dashboard/page.tsx    #   数据大屏
-│   │   └── operations/page.tsx   #   运维管理
-│   ├── components/               # 公共组件
-│   └── lib/                      # 工具库
-├── tests/                        # 测试
-├── k8s/                          # Kubernetes 部署清单
-│   ├── gateway/                  #   Kong网关配置
-│   └── overlays/                 #   多环境Overlay
-├── scripts/                      # 运维脚本
-├── docs/                         # 文档
-├── artifacts/                    # 构建产物
-│   └── erp_local/                #   ERP本地真实样本
-├── docker-compose.yml            # Docker编排
-├── Dockerfile                    # 容器镜像
-├── pyproject.toml                # 依赖管理
-└── .env.example                  # 环境变量模板
+├── src/                              # 后端源码
+│   ├── agents/                       # AI Agent 模块
+│   │   ├── selection_master.py       #   编排器（状态机）
+│   │   ├── data_collection.py        #   数据采集 Agent
+│   │   ├── market_insight.py         #   市场洞察 Agent
+│   │   ├── product_planner.py        #   产品规划 Agent
+│   │   ├── commercial.py             #   商业化 Agent
+│   │   ├── human_in_loop.py          #   人工干预接口
+│   │   └── framework_adapter.py      #   多框架适配器
+│   ├── api/v1/endpoints/             # API 路由（薄层）
+│   │   ├── selection.py              #   选品任务端点
+│   │   ├── agents.py                 #   Agent 管理
+│   │   ├── knowledge.py              #   知识库
+│   │   ├── reports.py                #   报告中心
+│   │   ├── erp_domains.py            #   ERP 14 域集成
+│   │   ├── integration.py            #   遗留 ERP 集成
+│   │   └── auth.py                   #   认证
+│   ├── apps/                         # AI 中台服务
+│   │   ├── llm_service.py            #   LLM 路由服务
+│   │   ├── rag_service.py            #   RAG 检索服务
+│   │   ├── agent_service.py          #   Agent 生命周期服务
+│   │   └── embedding_service.py      #   向量化服务
+│   ├── core/                         # 核心基础
+│   │   ├── pms_governance.py         #   建议生命周期 + 数据主权
+│   │   ├── auth.py / rbac.py         #   认证 + RBAC
+│   │   ├── tenant.py                 #   多租户隔离
+│   │   ├── data_masking.py           #   数据脱敏
+│   │   ├── waf.py                    #   IP 白名单 + WAF
+│   │   ├── rate_limit.py             #   限流
+│   │   └── tracing.py                #   分布式追踪
+│   ├── infrastructure/               # 基础设施适配器
+│   │   ├── database.py               #   PostgreSQL（异步连接池）
+│   │   ├── redis.py                  #   Redis
+│   │   ├── qdrant.py                 #   Qdrant 向量库
+│   │   ├── kafka.py                  #   Kafka 消息队列
+│   │   ├── llm_gateway.py            #   LLM 智能路由
+│   │   ├── hybrid_retrieval.py       #   混合检索
+│   │   ├── graph_rag.py              #   GraphRAG
+│   │   ├── amazon_sp_api_client.py   #   Amazon SP-API（含本地降级）
+│   │   ├── tiktok_business_client.py #   TikTok Business API（含本地降级）
+│   │   ├── google_trends_client.py   #   Google Trends（含本地降级）
+│   │   ├── ali1688_open_client.py    #   1688 Open API（含本地降级）
+│   │   ├── scm_client.py             #   SCM 域客户端
+│   │   ├── wms_client.py             #   WMS 域客户端
+│   │   ├── oms_client.py             #   OMS 域客户端
+│   │   ├── crm_client.py             #   CRM 域客户端
+│   │   ├── fms_client.py             #   FMS 域客户端
+│   │   ├── bi_client.py              #   BI 域客户端
+│   │   ├── ads_client.py             #   ADS 域客户端
+│   │   ├── som_client.py             #   SOM 域客户端
+│   │   ├── fba_client.py             #   FBA 域客户端
+│   │   ├── pdm_client.py             #   PDM 域客户端
+│   │   ├── iam_client.py             #   IAM 域客户端
+│   │   ├── tms_client.py             #   TMS 域客户端
+│   │   └── ...                       #   其他基础设施
+│   ├── services/                     # 业务逻辑层
+│   │   ├── selection_service.py      #   选品任务 + 采纳
+│   │   ├── suggestion_service.py     #   17 状态建议生命周期
+│   │   ├── execution_tracking_service.py # ERP 执行状态追踪
+│   │   ├── erp_workflow_service.py   #   ERP 工作流编排
+│   │   ├── erp_integration_service.py #  ERP 集成服务
+│   │   ├── erp_feedback_consumer.py  #   Kafka ERP 反馈消费者
+│   │   ├── profit_optimization_service.py # 利润优化
+│   │   ├── channel_delivery_service.py #  多渠道投递
+│   │   └── ...                       #   其他服务
+│   ├── repositories/                 # 数据访问层
+│   ├── models/                       # ORM + Pydantic 模式
+│   ├── workers/                      # 后台工作器
+│   │   ├── erp_feedback_worker.py    #   ERP 反馈 Kafka 消费者
+│   │   ├── selection_worker.py       #   选品任务工作器
+│   │   └── celery_tasks.py          #   Celery 任务定义
+│   ├── rag/                          # RAG 管道
+│   │   ├── indexer.py                #   文档索引
+│   │   ├── retriever.py              #   混合检索
+│   │   ├── chunkers.py               #   文本分块
+│   │   └── collections.py            #   集合管理
+│   └── crawlers/                     # 网络爬虫
+│       ├── amazon.py                 #   Amazon 爬虫
+│       └── scrapy_local/             #   Scrapy 本地爬虫
+├── frontend/                         # 前端源码
+│   ├── app/                          # Next.js App Router 页面
+│   ├── components/                   # 共享组件
+│   │   ├── common/                   #   AppShell, AuthGuard, DashboardCharts
+│   │   ├── agents/                   #   TopologyPanel, LogPanel, WorkflowDebugPanel
+│   │   └── workbench/                #   SelectionCreateForm, SelectionTaskTable
+│   └── lib/                          # API 客户端、认证、类型契约
+├── tests/                            # 测试套件
+├── k8s/                              # Kubernetes 部署清单
+│   ├── gateway/                      #   Kong 网关配置
+│   └── overlays/                     #   多环境 Overlay
+├── scripts/                          # 运维脚本
+├── docs/                             # 文档
+├── docker-compose.yml                # Docker Compose 编排
+├── Dockerfile                        # 容器镜像
+├── pyproject.toml                    # 依赖管理
+└── .env.example                      # 环境变量模板
 ```
 
-## 6. 环境入口
-
-- 本地开发 / 本地验收：`D:/Project/fms/docs/local-runtime/README.md`
-- 多环境规划（`local` / `dev` / `prod`）：`D:/Project/fms/docs/environments/README.md`
-
 ***
 
-## 6. 运行要求
+## 快速开始
 
-### 6.1 必需
+### 前置依赖
 
-| 依赖         | 版本    | 用途       |
-| ---------- | ----- | -------- |
-| Python     | 3.11+ | 后端运行时    |
-| PostgreSQL | 14+   | 业务数据存储   |
-| Redis      | 7.0+  | 缓存/限流/会话 |
+| 依赖             | 版本    | 是否必须  |
+| -------------- | ----- | ----- |
+| Python         | 3.11+ | ✅     |
+| PostgreSQL     | 14+   | ✅     |
+| Redis          | 7.0+  | ✅     |
+| Node.js        | 18+   | ✅（前端） |
+| Docker Desktop | 最新版   | 推荐    |
+| Qdrant         | 1.7+  | 可选    |
+| Kafka          | 3.6+  | 可选    |
 
-### 6.2 推荐
-
-| 依赖             | 版本    | 用途         |
-| -------------- | ----- | ---------- |
-| Qdrant         | 1.7+  | 向量检索       |
-| Kafka          | 3.6+  | 消息队列 / CDC |
-| OpenSearch     | 2.11+ | 全文检索       |
-| Docker Desktop | 最新    | 容器化运行      |
-| WSL2           | 最新    | Linux容器支持  |
-| Node.js        | 18+   | 前端构建       |
-
-### 6.3 可选（生产环境）
-
-| 依赖                   | 用途    |
-| -------------------- | ----- |
-| Kong Gateway         | API网关 |
-| Prometheus + Grafana | 监控告警  |
-| vLLM / Triton        | 模型推理  |
-| MinIO                | 对象存储  |
-
-***
-
-## 7. 快速开始
-
-### 7.1 本地开发
+### 本地开发
 
 ```bash
-# 1. 创建虚拟环境
+# 1. 克隆仓库
+git clone https://github.com/<your-username>/pms.git
+cd pms
+
+# 2. 创建虚拟环境并安装依赖
 python -m venv .venv
-.\.venv\Scripts\activate          # Windows
-# source .venv/bin/activate       # Linux/Mac
-
-# 2. 安装依赖
-pip install .
-
-# 3. 配置环境变量
-copy .env.example .env
-# 编辑 .env 文件，填入数据库连接等配置
-
-# 4. 查看本地运行摘要与配置校验
-python scripts/local_runtime_manager.py summary
-python scripts/local_runtime_manager.py check --probes
-python scripts/run_local_pilot_acceptance.py
-
-# 5. 安装或刷新 Python 依赖
+source .venv/bin/activate    # Linux/Mac
+# .\.venv\Scripts\activate   # Windows
 python scripts/install_python_deps.py --run-check
 
-# 6. 检查宿主机软件（Docker / WSL；按需附带 Node / Ollama）
-python scripts/install_local_software.py
-# python scripts/install_local_software.py --include-node
+# 3. 配置环境变量
+cp .env.example .env
+# 编辑 .env 填入数据库连接等配置
 
-# 7. 启动本地依赖服务
+# 4. 启动本地依赖服务
 python scripts/start_local_services.py
-# python scripts/start_local_services.py --with-ollama
-# python scripts/start_local_services.py --with-platform
 
-# 8. 启动后端（依赖服务启动后）
-scripts\start_local.ps1           # Windows PowerShell
-# ./scripts/start_local.sh        # Linux / WSL
+# 5. 启动后端
+python scripts/start_local.sh    # Linux/Mac
+# scripts\start_local.ps1       # Windows
 
-# 等价的 Compose 口径
-# docker compose -f docker-compose.yml up -d --build --no-deps app
-
-# 9. 启动前端（另一个终端）
+# 6. 启动前端（另一个终端）
 cd frontend
 npm install
 npm run dev
 ```
 
-### 7.2 Docker Compose
+### Docker Compose
 
 ```bash
-# 手工方式：启动基础设施
-# 推荐优先使用 python scripts/start_local_services.py
 docker compose up -d
-
-# 手工方式：只重建并启动后端容器
 docker compose up -d --build --no-deps app
-
-# 查看服务状态
-docker compose ps
-
-# 停止基础设施
-docker compose down
 ```
 
-### 7.3 访问地址
+### 访问地址
 
-> 本地 `local-real` 场景下，如果启用了 `docker-compose.wsl-local.yml` 的 Kong：
->
-> - 代理入口仍是 `http://localhost:8000`
-> - FastAPI 直连入口是 `http://localhost:18000`
->
-> 详细说明见 `docs/local-runtime/`
-
-| 服务               | 地址                              |
+| 服务               | URL                             |
 | ---------------- | ------------------------------- |
 | 前端工作台            | <http://localhost:3000>         |
 | API 文档 (Swagger) | <http://localhost:18000/docs>   |
 | API 文档 (ReDoc)   | <http://localhost:18000/redoc>  |
 | 健康检查             | <http://localhost:18000/health> |
-| 就绪检查             | <http://localhost:18000/ready>  |
-| 存活检查             | <http://localhost:18000/live>   |
 
 ***
 
-## 8. 配置说明
+## 截图展示
 
-### 8.1 环境变量
+> 截图存储在 `docs/github/screenshots/`，详见 [SCREENSHOT\_GUIDE.md](docs/github/SCREENSHOT_GUIDE.md)。
 
-项目通过 `.env` 文件管理环境变量，主要前缀：
+|          蓝图总览          |            选品工作台            |        利润中心        |
+| :--------------------: | :-------------------------: | :----------------: |
+| *\[首页服务状态、风险雷达、工作台入口]* | *\[任务创建、实时 SSE 流、趋势图、审批操作]* | *\[利润指标、ROI、闭环进度]* |
 
-| 前缀               | 用途         | 示例                                                     |
-| ---------------- | ---------- | ------------------------------------------------------ |
-| `APP_`           | 应用配置       | `APP_NAME`, `APP_ENVIRONMENT`                          |
-| `DB_`            | PostgreSQL | `DB_URL`, `DB_POOL_SIZE`                               |
-| `REDIS_`         | Redis      | `REDIS_URL`                                            |
-| `QDRANT_`        | Qdrant     | `QDRANT_HOST`, `QDRANT_PORT`, `QDRANT_URL`             |
-| `KAFKA_`         | Kafka      | `KAFKA_BOOTSTRAP_SERVERS`                              |
-| `SEC_`           | 安全         | `SEC_SECRET_KEY`                                       |
-| `LLM_`           | LLM        | `LLM_PRIMARY_MODEL`, `LLM_OLLAMA_ENDPOINT`             |
-| `LOCAL_RUNTIME_` | 本地运行模式     | `LOCAL_RUNTIME_PROFILE`, `LOCAL_RUNTIME_SCENARIO_MODE` |
-| `SERVICE_MODE_`  | 服务化模式      | `SERVICE_MODE_LLM_MODE`, `SERVICE_MODE_LLM_BASE_URL`   |
-| `DINGTALK_`      | 钉钉         | `DINGTALK_WEBHOOK_URL`                                 |
-| `WECHAT_`        | 企业微信       | `WECHAT_WEBHOOK_URL`                                   |
-| `SMTP_`          | 邮件         | `SMTP_SERVER`, `SMTP_PORT`                             |
-
-### 8.2 依赖管理
-
-统一以 `pyproject.toml` 为单一依赖源，不再使用 `requirements.txt`。
+|         Agent 平台        |         知识库         |       报告中心      |
+| :---------------------: | :-----------------: | :-------------: |
+| *\[Agent 拓扑、日志、人工干预面板]* | *\[文档上传、检索测试、评估指标]* | *\[报告生成、下载、归档]* |
 
 ***
 
-## 9. 测试
+## 架构决策记录
+
+| 决策        | 选择                            | 理由                       |
+| --------- | ----------------------------- | ------------------------ |
+| 建议池模式     | PMS 提交建议，ERP 审批执行             | 防止 AI 直接写入业务数据，确保人工监督    |
+| 17 状态生命周期 | 完整状态机 + 控制方归属                 | 清晰问责：PMS/ERP/系统/用户各控特定转换 |
+| 数据主权矩阵    | PMS 仅可建议/草稿，不可终端写入            | 强制域边界，ERP 拥有所有终端业务记录     |
+| 审计上下文     | 10 维上下文 + 校验                  | 每次 ERP 调用完整可追溯，支持合规审计    |
+| 本地降级链路    | `local://` 端点用于外部数据客户端        | 无 API 凭证时系统仍可运行，支持演示/离线  |
+| BFF 层     | 按工作台的 Backend-for-Frontend 契约 | 前端获取精确数据形态，无过度/不足获取      |
+| 事件驱动反馈    | Kafka 消费者处理 ERP 反馈事件          | 解耦反馈环，支持异步处理和重试          |
+
+***
+
+## 测试
 
 ```bash
 # 运行核心回归测试
@@ -439,84 +467,77 @@ python -m pytest tests/test_api_integration.py tests/test_minimal_trusted_phase3
 # 运行全部测试
 python -m pytest -q
 
-# 语法检查
-python -m py_compile src/main.py
-
-# 代码规范检查
-ruff check src tests
-
-# 类型检查
-mypy src
+# 代码质量
+ruff check src tests          # Lint
+mypy src                      # 类型检查
+python -m py_compile src/main.py  # 语法检查
 ```
 
 ***
 
-## 10. 当前实现状态
+## 实现状态
 
-> 详细差距分析见 [20260414差异分析报告.md](20260414差异分析报告.md)
+### 已完成 ✅
 
-### 10.1 已实现
+- FastAPI 应用入口 + 生命周期管理
+- 5 AI Agent 核心逻辑（数据采集 → 市场洞察 → 产品规划 → 商业化 → 报告）
+- SelectionMaster 状态机编排
+- LLM 网关智能路由（多模型 / 熔断 / 降级）
+- RAG 混合检索 + GraphRAG 知识图谱
+- 多租户隔离 + RBAC + 审计日志
+- 数据脱敏 + IP 白名单 + Prompt 注入防护
+- ERP 14 域客户端集成（SCM/WMS/OMS/CRM/FMS/BI/ADS/FBA/TMS/PDM/SOM/IAM/SYS/Dashboard）
+- 建议池模式 + 17 状态生命周期
+- 执行状态追踪服务 + ERP 域状态同步
+- Kafka ERP 反馈消费者
+- 利润中心闭环（CRM/FMS/BI 数据查询）
+- 外部数据源本地降级（Amazon/TikTok/Google Trends/1688）
+- 多渠道投递（钉钉/企微/邮件）
+- Next.js 15 页面多角色工作台
+- Docker Compose 编排
+- Kong 网关 + K8s 部署清单
+- CI/CD 管道（GitHub Actions）
 
-| 能力                                        | 状态    |
-| ----------------------------------------- | ----- |
-| FastAPI 应用入口 + 生命周期管理                     | ✅ 已实现 |
-| 选品任务 API + SelectionMaster 状态机编排          | ✅ 已实现 |
-| 5 大 Agent 核心逻辑（数据采集/市场洞察/产品规划/商业化/报告）     | ✅ 已实现 |
-| LLM Gateway 智能路由（多模型/熔断器/降级）              | ✅ 已实现 |
-| RAG 混合检索 + GraphRAG 知识图谱                  | ✅ 已实现 |
-| 多租户隔离 + RBAC + 审计日志                       | ✅ 已实现 |
-| 数据脱敏 + IP 白名单 + Prompt 注入防护               | ✅ 已实现 |
-| 多通道消息交付（钉钉/企业微信/邮件）                       | ✅ 已实现 |
-| ERP 客户端（OMS/WMS/SCM/CRM/FMS/BI）           | ✅ 已实现 |
-| Amazon 爬虫框架 + 反爬策略                        | ✅ 已实现 |
-| 外部信号服务（Wikipedia/GitHub/HackerNews 真实API） | ✅ 已实现 |
-| Next.js 前端工作台（多页面）                        | ✅ 已实现 |
-| PostgreSQL / Redis / Qdrant / Kafka 客户端   | ✅ 已实现 |
-| Docker Compose 编排                         | ✅ 已实现 |
-| Kong 网关配置 + K8s 部署清单                      | ✅ 已实现 |
+### 进行中 🔄
 
-### 10.2 待完善（目标态）
-
-| 能力             | 当前状态        | 目标                                                 |
-| -------------- | ----------- | -------------------------------------------------- |
-| 真实外部 API 集成    | 模拟数据为主      | Amazon SP-API / TikTok / 1688 / Google Trends 真实调用 |
-| 爬虫系统           | Amazon 单一爬虫 | Scrapy/Playwright 完整爬虫平台 + 代理IP池                   |
-| LangGraph 框架集成 | 自研状态机       | 迁移到 LangGraph + AutoGen/CrewAI 多框架协作               |
-| 流处理管道          | 未实现         | Flink/Spark 特征工程 + 实时处理                            |
-| ERP 真实对接       | 本地样本联调      | staging HTTP 真实系统联调                                |
-| 前端完整工作台        | 基础页面        | Agent 监控面板 + RAG 知识库管理 + 完整报告中心                    |
-| vLLM 集群        | 模拟模式        | 真实推理集群部署                                           |
-| 监控仪表板          | 配置文件        | Grafana 仪表板 + 告警规则                                 |
+- 真实外部 API 集成（Amazon SP-API / TikTok / 1688 需凭证）
+- Scrapy/Playwright 完整爬虫平台
+- Flink/Spark 流处理管道
+- vLLM 推理集群部署
+- Grafana 看板 + 告警规则
 
 ***
 
-## 11. 相关文档
+## 文档
 
-### 设计文档
-
-| 文档                                                          | 说明        |
-| ----------------------------------------------------------- | --------- |
-| [跨境电商AI选品系统PMS—架构与业务设计文档.md](跨境电商AI选品系统PMS—%20架构与业务设计文档.md) | 技术栈与架构基准  |
-| [跨境电商AI选品系统---分层架构与数据流协作.md](跨境电商AI选品系统---分层架构与数据流协作.md)    | 业务流与数据流基准 |
-| [选品系统设计方案.md](选品系统设计方案.md)                                  | 原始设计方案    |
-
-### 分析报告
-
-| 文档                                       | 说明     |
-| ---------------------------------------- | ------ |
-| [20260414差异分析报告.md](20260414差异分析报告.md)   | 最新差距分析 |
-| [本地环境准备-详解安装部署使用.md](本地环境准备-详解安装部署使用.md) | 环境搭建指南 |
-
-### 运维文档
-
-| 文档                                       | 说明      |
-| ---------------------------------------- | ------- |
-| [docs/architecture/](docs/architecture/) | 架构设计文档集 |
-| [docs/deliverables/](docs/deliverables/) | 交付物文档集  |
-| [docs/phase4/](docs/phase4/)             | 上线阶段文档集 |
+| 文档                                              | 说明        |
+| ----------------------------------------------- | --------- |
+| [架构文档](docs/github/ARCHITECTURE.md)             | 五大架构视图详解  |
+| [MVP 范围](docs/github/MVP_SCOPE.md)              | MVP 范围与边界 |
+| [演示脚本](docs/github/DEMO_SCRIPT.md)              | 逐步演示流程    |
+| [验收证据](docs/github/ACCEPTANCE_EVIDENCE.md)      | 验证产物      |
+| [环境配置](docs/github/ENV_EXAMPLE.md)              | 环境变量说明    |
+| [发布清单](docs/github/PUBLIC_RELEASE_CHECKLIST.md) | 公开发布准备    |
+| [GitHub 发布指南](docs/github/GITHUB_RELEASE_GUIDE.md) | GitHub 发布步骤 |
 
 ***
 
-## 12. License
+## 参与贡献
 
-Private — Internal Use Only
+欢迎贡献！提交 PR 前请阅读贡献指南。
+
+1. Fork 本仓库
+2. 创建特性分支（`git checkout -b feature/amazing-feature`）
+3. 提交更改（`git commit -m 'Add amazing feature'`）
+4. 推送到分支（`git push origin feature/amazing-feature`）
+5. 发起 Pull Request
+
+***
+
+## 许可证
+
+本项目基于 Apache License 2.0 许可 — 详见 [LICENSE](./LICENSE) 文件。
+
+***
+
+**以架构纪律、业务优先思维和生产级工程构建。**

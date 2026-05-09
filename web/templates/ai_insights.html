@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI选品系统 - AI洞察</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+        .form-group { margin-bottom:1rem; }
+        .form-group label { display:block; font-weight:500; margin-bottom:0.3rem; font-size:0.875rem; color:var(--gray-700); }
+        .form-group input, .form-group select, .form-group textarea { width:100%; padding:0.5rem 0.75rem; border:1px solid var(--gray-300); border-radius:6px; font-size:0.875rem; }
+        .btn { padding:0.5rem 1.25rem; border:none; border-radius:6px; cursor:pointer; font-size:0.875rem; transition:all 0.2s; }
+        .btn-primary { background:var(--primary); color:#fff; }
+        .btn-primary:hover { background:var(--primary-dark); }
+        .btn-outline { background:transparent; border:1px solid var(--gray-300); color:var(--gray-700); }
+        .card { background:#fff; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.08); padding:1.5rem; margin-bottom:1.5rem; }
+        .card h3 { margin-bottom:1rem; font-size:1.1rem; }
+        .tabs { display:flex; gap:0; border-bottom:2px solid var(--gray-200); margin-bottom:1.5rem; flex-wrap:wrap; }
+        .tab { padding:0.75rem 1.25rem; cursor:pointer; font-weight:500; color:var(--gray-500); border-bottom:2px solid transparent; margin-bottom:-2px; transition:all 0.2s; font-size:0.9rem; }
+        .tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+        .tab:hover { color:var(--primary); }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+        .result-card { background:var(--gray-50); border-radius:8px; padding:1rem; margin-top:1rem; }
+        .metric-row { display:flex; gap:1rem; flex-wrap:wrap; margin:0.5rem 0; }
+        .metric-item { background:#fff; padding:0.75rem 1rem; border-radius:6px; border-left:3px solid var(--primary); flex:1; min-width:120px; }
+        .metric-value { font-size:1.25rem; font-weight:700; }
+        .metric-label { font-size:0.75rem; color:var(--gray-500); }
+        .risk-critical { color:#ef4444; }
+        .risk-high { color:#f59e0b; }
+        .risk-medium { color:#3b82f6; }
+        .risk-low { color:#10b981; }
+        .feature-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:1rem; }
+        .feature-card { background:var(--gray-50); border-radius:8px; padding:1rem; border:1px solid var(--gray-200); }
+        .feature-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; }
+        .feature-name { font-weight:600; font-size:0.9rem; }
+        .toggle-switch { position:relative; width:44px; height:24px; }
+        .toggle-switch input { opacity:0; width:0; height:0; }
+        .toggle-slider { position:absolute; cursor:pointer; inset:0; background:var(--gray-300); border-radius:24px; transition:0.3s; }
+        .toggle-slider:before { content:''; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background:var(--success); }
+        .toggle-switch input:checked + .toggle-slider:before { transform:translateX(20px); }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🎯 AI选品系统</div>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/selection">选品任务</a>
+            <a href="/approval">审批管理</a>
+            <a href="/recommendations">建议池</a>
+            <a href="/ads-optimization">广告优化</a>
+            <a href="/fba-restock">FBA补货</a>
+            <a href="/ai-insights" class="active">AI洞察</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>🧠 AI洞察中心</h1>
+            <p class="subtitle">风控评估、定价建议、库存预测、情感分析、AI功能开关</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('risk')">风控评估</div>
+            <div class="tab" onclick="switchTab('pricing')">定价建议</div>
+            <div class="tab" onclick="switchTab('inventory')">库存预测</div>
+            <div class="tab" onclick="switchTab('sentiment')">情感分析</div>
+            <div class="tab" onclick="switchTab('features')">AI功能开关</div>
+        </div>
+
+        <div class="tab-content active" id="tab-risk">
+            <div class="card">
+                <h3>🛡️ 风控评估</h3>
+                <form id="riskForm" onsubmit="handleRiskAssess(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>风险类型 *</label>
+                            <select id="riskType" required>
+                                <option value="order_risk">订单风险</option>
+                                <option value="supply_risk">供应风险</option>
+                                <option value="inventory_risk">库存风险</option>
+                                <option value="compliance_risk">合规风险</option>
+                                <option value="pricing_risk">定价风险</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>目标域 *</label>
+                            <select id="riskDomain" required>
+                                <option value="scm">SCM供应链</option>
+                                <option value="wms">WMS仓储</option>
+                                <option value="oms">OMS订单</option>
+                                <option value="fba">FBA海外仓</option>
+                                <option value="tms">TMS物流</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>目标对象ID</label>
+                            <input type="text" id="riskTargetId" placeholder="产品/订单/仓库ID">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">执行风控评估</button>
+                </form>
+                <div id="riskResult"></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-pricing">
+            <div class="card">
+                <h3>💲 定价建议</h3>
+                <form id="pricingForm" onsubmit="handlePricing(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>产品ID *</label>
+                            <input type="text" id="pricingProductId" required placeholder="输入产品UUID">
+                        </div>
+                        <div class="form-group">
+                            <label>当前价格</label>
+                            <input type="number" id="pricingCurrentPrice" step="0.01" min="0" placeholder="当前售价">
+                        </div>
+                        <div class="form-group">
+                            <label>成本价格</label>
+                            <input type="number" id="pricingCostPrice" step="0.01" min="0" placeholder="成本价">
+                        </div>
+                        <div class="form-group">
+                            <label>目标利润率</label>
+                            <input type="number" id="pricingTargetMargin" step="0.01" min="0" max="1" placeholder="0.3 = 30%">
+                        </div>
+                        <div class="form-group">
+                            <label>市场平台</label>
+                            <select id="pricingMarketplace">
+                                <option value="amazon_us">Amazon US</option>
+                                <option value="amazon_eu">Amazon EU</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">生成定价建议</button>
+                </form>
+                <div id="pricingResult"></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-inventory">
+            <div class="card">
+                <h3>📊 库存预测</h3>
+                <form id="inventoryForm" onsubmit="handleInventoryPredict(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>产品ID</label>
+                            <input type="text" id="invProductId" placeholder="输入产品UUID">
+                        </div>
+                        <div class="form-group">
+                            <label>SKU</label>
+                            <input type="text" id="invSku" placeholder="SKU编码">
+                        </div>
+                        <div class="form-group">
+                            <label>当前库存</label>
+                            <input type="number" id="invCurrentStock" min="0" placeholder="当前库存">
+                        </div>
+                        <div class="form-group">
+                            <label>日均销量</label>
+                            <input type="number" id="invDailyVelocity" step="0.1" min="0" placeholder="日均销量">
+                        </div>
+                        <div class="form-group">
+                            <label>预测周期(天)</label>
+                            <select id="invHorizon">
+                                <option value="7">7天</option>
+                                <option value="14">14天</option>
+                                <option value="30" selected>30天</option>
+                                <option value="90">90天</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>市场平台</label>
+                            <select id="invMarketplace">
+                                <option value="amazon_us">Amazon US</option>
+                                <option value="amazon_eu">Amazon EU</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">生成库存预测</button>
+                </form>
+                <div id="inventoryResult"></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-sentiment">
+            <div class="card">
+                <h3>💬 情感分析</h3>
+                <form id="sentimentForm" onsubmit="handleSentimentAnalyze(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>产品ID</label>
+                            <input type="text" id="sentProductId" placeholder="输入产品UUID">
+                        </div>
+                        <div class="form-group">
+                            <label>来源类型 *</label>
+                            <select id="sentSourceType" required>
+                                <option value="review">评论</option>
+                                <option value="qna">问答</option>
+                                <option value="social_media">社交媒体</option>
+                                <option value="customer_service">客服</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>市场平台</label>
+                            <select id="sentMarketplace">
+                                <option value="amazon_us">Amazon US</option>
+                                <option value="amazon_eu">Amazon EU</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>分析周期</label>
+                            <input type="text" id="sentPeriod" placeholder="如: 2024-Q1, last_30_days">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">执行情感分析</button>
+                </form>
+                <div id="sentimentResult"></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-features">
+            <div class="card">
+                <h3>⚙️ AI功能开关</h3>
+                <p style="color:var(--gray-500);margin-bottom:1rem;font-size:0.875rem;">控制各AI增强功能的启用/禁用状态</p>
+                <div class="feature-grid" id="featureGrid">
+                    <div style="text-align:center;padding:2rem;color:var(--gray-500);grid-column:1/-1;">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/erp_domains_api.js"></script>
+    <script>
+        const FEATURES = [
+            { key: 'ai_selection', name: 'AI选品', desc: 'AI驱动的选品推荐' },
+            { key: 'ai_pricing', name: 'AI定价', desc: '智能定价建议' },
+            { key: 'ai_restock', name: 'AI补货', desc: 'FBA智能补货建议' },
+            { key: 'ai_ad_optimization', name: 'AI广告优化', desc: '广告竞价与关键词优化' },
+            { key: 'ai_risk_scoring', name: 'AI风控评分', desc: '多维度风控评估' },
+            { key: 'ai_sentiment', name: 'AI情感分析', desc: '评论与社媒情感洞察' },
+            { key: 'ai_inventory_prediction', name: 'AI库存预测', desc: '需求预测与补货点计算' },
+            { key: 'ai_logistics_risk', name: 'AI物流风险', desc: '物流延误与成本风险' },
+            { key: 'ai_profit_insight', name: 'AI利润洞察', desc: '利润分析与优化建议' },
+        ];
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + name).classList.add('active');
+            if (name === 'features') loadFeatures();
+        }
+
+        async function handleRiskAssess(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = '评估中...';
+            try {
+                const result = await ErpDomainsAPI.assessRisk({
+                    risk_type: document.getElementById('riskType').value,
+                    target_domain: document.getElementById('riskDomain').value,
+                    target_id: document.getElementById('riskTargetId').value || undefined,
+                });
+                document.getElementById('riskResult').innerHTML = `
+                    <div class="result-card">
+                        <h4>✅ 风控评估结果</h4>
+                        <div class="metric-row">
+                            <div class="metric-item"><div class="metric-value risk-${result.risk_level || 'medium'}">${result.risk_score != null ? result.risk_score.toFixed(1) : '-'}</div><div class="metric-label">风险评分(0-100)</div></div>
+                            <div class="metric-item"><div class="metric-value risk-${result.risk_level || 'medium'}">${escapeHtml(result.risk_level || '-')}</div><div class="metric-label">风险等级</div></div>
+                        </div>
+                        ${result.risk_factors ? `<div style="margin-top:0.75rem;"><strong>风险因子:</strong><pre style="font-size:0.8rem;background:#fff;padding:0.75rem;border-radius:6px;overflow-x:auto;">${escapeHtml(JSON.stringify(result.risk_factors, null, 2))}</pre></div>` : ''}
+                        ${result.mitigation_suggestions ? `<div style="margin-top:0.5rem;"><strong>缓解建议:</strong><pre style="font-size:0.8rem;background:#fff;padding:0.75rem;border-radius:6px;overflow-x:auto;">${escapeHtml(JSON.stringify(result.mitigation_suggestions, null, 2))}</pre></div>` : ''}
+                    </div>`;
+                showToast('风控评估完成', 'success');
+            } catch (err) {
+                document.getElementById('riskResult').innerHTML = `<div class="result-card" style="color:var(--danger)">评估失败: ${escapeHtml(err.message)}</div>`;
+            } finally { btn.disabled = false; btn.textContent = '执行风控评估'; }
+        }
+
+        async function handlePricing(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = '生成中...';
+            try {
+                const result = await ErpDomainsAPI.generatePricingSuggestion({
+                    product_id: document.getElementById('pricingProductId').value,
+                    current_price: parseFloat(document.getElementById('pricingCurrentPrice').value) || undefined,
+                    cost_data: { total_cost: parseFloat(document.getElementById('pricingCostPrice').value) || 0 },
+                    target_margin: parseFloat(document.getElementById('pricingTargetMargin').value) || undefined,
+                    marketplace: document.getElementById('pricingMarketplace').value,
+                });
+                document.getElementById('pricingResult').innerHTML = `
+                    <div class="result-card">
+                        <h4>✅ 定价建议</h4>
+                        <div class="metric-row">
+                            <div class="metric-item"><div class="metric-value">$${result.suggested_price != null ? result.suggested_price.toFixed(2) : '-'}</div><div class="metric-label">建议价格</div></div>
+                            <div class="metric-item"><div class="metric-value">$${result.min_price != null ? result.min_price.toFixed(2) : '-'}</div><div class="metric-label">最低价格</div></div>
+                            <div class="metric-item"><div class="metric-value">$${result.max_price != null ? result.max_price.toFixed(2) : '-'}</div><div class="metric-label">最高价格</div></div>
+                            <div class="metric-item"><div class="metric-value">${result.estimated_margin != null ? (result.estimated_margin * 100).toFixed(1) + '%' : '-'}</div><div class="metric-label">预估利润率</div></div>
+                            <div class="metric-item"><div class="metric-value">${result.confidence != null ? (result.confidence * 100).toFixed(1) + '%' : '-'}</div><div class="metric-label">置信度</div></div>
+                        </div>
+                        ${result.reasoning ? `<div style="margin-top:0.75rem;"><strong>定价理由:</strong><p style="font-size:0.85rem;">${escapeHtml(result.reasoning)}</p></div>` : ''}
+                    </div>`;
+                showToast('定价建议已生成', 'success');
+            } catch (err) {
+                document.getElementById('pricingResult').innerHTML = `<div class="result-card" style="color:var(--danger)">生成失败: ${escapeHtml(err.message)}</div>`;
+            } finally { btn.disabled = false; btn.textContent = '生成定价建议'; }
+        }
+
+        async function handleInventoryPredict(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = '预测中...';
+            try {
+                const result = await ErpDomainsAPI.predictInventory({
+                    product_id: document.getElementById('invProductId').value || undefined,
+                    sku: document.getElementById('invSku').value || undefined,
+                    current_stock: parseInt(document.getElementById('invCurrentStock').value) || undefined,
+                    daily_velocity: parseFloat(document.getElementById('invDailyVelocity').value) || undefined,
+                    prediction_horizon_days: parseInt(document.getElementById('invHorizon').value) || 30,
+                    marketplace: document.getElementById('invMarketplace').value,
+                });
+                document.getElementById('inventoryResult').innerHTML = `
+                    <div class="result-card">
+                        <h4>✅ 库存预测结果</h4>
+                        <div class="metric-row">
+                            <div class="metric-item"><div class="metric-value">${result.predicted_demand_short != null ? result.predicted_demand_short.toFixed(0) : '-'}</div><div class="metric-label">7天预测需求</div></div>
+                            <div class="metric-item"><div class="metric-value">${result.predicted_demand_medium != null ? result.predicted_demand_medium.toFixed(0) : '-'}</div><div class="metric-label">30天预测需求</div></div>
+                            <div class="metric-item"><div class="metric-value">${result.stockout_probability != null ? (result.stockout_probability * 100).toFixed(1) + '%' : '-'}</div><div class="metric-label">缺货概率</div></div>
+                            <div class="metric-item"><div class="metric-value">${result.reorder_point || '-'}</div><div class="metric-label">补货点</div></div>
+                            <div class="metric-item"><div class="metric-value">${result.optimal_order_quantity || '-'}</div><div class="metric-label">最优订货量</div></div>
+                            <div class="metric-item"><div class="metric-value">${result.confidence != null ? (result.confidence * 100).toFixed(1) + '%' : '-'}</div><div class="metric-label">置信度</div></div>
+                        </div>
+                    </div>`;
+                showToast('库存预测完成', 'success');
+            } catch (err) {
+                document.getElementById('inventoryResult').innerHTML = `<div class="result-card" style="color:var(--danger)">预测失败: ${escapeHtml(err.message)}</div>`;
+            } finally { btn.disabled = false; btn.textContent = '生成库存预测'; }
+        }
+
+        async function handleSentimentAnalyze(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = '分析中...';
+            try {
+                const result = await ErpDomainsAPI.analyzeSentiment({
+                    product_id: document.getElementById('sentProductId').value || undefined,
+                    source_type: document.getElementById('sentSourceType').value,
+                    marketplace: document.getElementById('sentMarketplace').value,
+                    analysis_period: document.getElementById('sentPeriod').value || undefined,
+                });
+                document.getElementById('sentimentResult').innerHTML = `
+                    <div class="result-card">
+                        <h4>✅ 情感分析结果</h4>
+                        <div class="metric-row">
+                            <div class="metric-item"><div class="metric-value">${result.sentiment_score != null ? result.sentiment_score.toFixed(2) : '-'}</div><div class="metric-label">情感评分(-1到1)</div></div>
+                            <div class="metric-item"><div class="metric-value">${escapeHtml(result.sentiment_label || '-')}</div><div class="metric-label">情感标签</div></div>
+                            <div class="metric-item"><div class="metric-value">${result.total_reviews || '-'}</div><div class="metric-label">评论总数</div></div>
+                            <div class="metric-item"><div class="metric-value">${result.negative_review_ratio != null ? (result.negative_review_ratio * 100).toFixed(1) + '%' : '-'}</div><div class="metric-label">负面评论比例</div></div>
+                        </div>
+                        ${result.pain_points && result.pain_points.length ? `<div style="margin-top:0.75rem;"><strong>用户痛点:</strong><ul style="margin-top:0.3rem;">${result.pain_points.map(p => `<li style="font-size:0.85rem;">${escapeHtml(typeof p === 'string' ? p : JSON.stringify(p))}</li>`).join('')}</ul></div>` : ''}
+                        ${result.improvement_suggestions && result.improvement_suggestions.length ? `<div style="margin-top:0.5rem;"><strong>改进建议:</strong><ul style="margin-top:0.3rem;">${result.improvement_suggestions.map(s => `<li style="font-size:0.85rem;color:var(--success);">${escapeHtml(typeof s === 'string' ? s : JSON.stringify(s))}</li>`).join('')}</ul></div>` : ''}
+                    </div>`;
+                showToast('情感分析完成', 'success');
+            } catch (err) {
+                document.getElementById('sentimentResult').innerHTML = `<div class="result-card" style="color:var(--danger)">分析失败: ${escapeHtml(err.message)}</div>`;
+            } finally { btn.disabled = false; btn.textContent = '执行情感分析'; }
+        }
+
+        async function loadFeatures() {
+            const grid = document.getElementById('featureGrid');
+            let html = '';
+            for (const f of FEATURES) {
+                let enabled = false;
+                try {
+                    const result = await ErpDomainsAPI.getAIFeatureToggle(f.key);
+                    enabled = result.is_enabled !== false;
+                } catch { enabled = false; }
+                html += `
+                    <div class="feature-card">
+                        <div class="feature-header">
+                            <span class="feature-name">${f.name}</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${enabled ? 'checked' : ''} onchange="toggleFeature('${f.key}', this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <p style="font-size:0.8rem;color:var(--gray-500);margin:0;">${f.desc}</p>
+                        <p style="font-size:0.75rem;color:${enabled ? 'var(--success)' : 'var(--gray-500)'};margin-top:0.3rem;">${enabled ? '● 已启用' : '○ 已禁用'}</p>
+                    </div>`;
+            }
+            grid.innerHTML = html;
+        }
+
+        async function toggleFeature(key, enabled) {
+            try {
+                await ErpDomainsAPI.setAIFeatureToggle({ feature_key: key, is_enabled: enabled });
+                showToast(`${key} 已${enabled ? '启用' : '禁用'}`, 'success');
+                loadFeatures();
+            } catch (err) {
+                showToast('设置失败: ' + err.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

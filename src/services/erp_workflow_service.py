@@ -330,3 +330,13 @@ class ERPWorkflowService:
         if task is None:
             raise ValueError(f"选品任务不存在: {task_id}")
         return task
+
+    async def track_execution_status(self, task_id: str) -> dict[str, Any]:
+        from src.services.execution_tracking_service import ExecutionTrackingService
+
+        tracking_service = ExecutionTrackingService(
+            self.session,
+            tenant_id=self.tenant_id,
+            actor=self.actor,
+        )
+        return await tracking_service.track_task_execution(task_id)

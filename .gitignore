@@ -51,6 +51,12 @@ env/*.shared
 !env/*.shared.example
 docker/dify-self-host/runtime/**/.env
 
+# Local backup files (contain real credentials, NOT for public release)
+backups/
+
+# GitHub publish configuration (contains credentials)
+.github-publish.env
+
 # Runtime markers, logs, and temp output
 .qdrant-initialized
 *.log
@@ -71,3 +77,22 @@ data/local_pilot/
 data/nflog
 data/silences
 storage/
+
+# Sensitive files - MUST NOT be committed
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+secrets/
+.secrets
+
+# Archive and internal documents (not for public release)
+_archive/
+
+# Large runtime artifacts
+*.db-journal
+*.wal
+
+# Trae IDE state
+.trae/

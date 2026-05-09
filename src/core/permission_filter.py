@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
-from src.core.pms_governance import PermissionContext
+from src.core.pms_governance import AuditContext, PermissionContext
 
 PERMISSION_FILTER_FIELDS: tuple[str, ...] = (
     "tenant_id",
@@ -16,17 +16,18 @@ PERMISSION_FILTER_FIELDS: tuple[str, ...] = (
     "supplier_id",
     "category_id",
     "data_level",
+    "source_system",
 )
 
 
-def _context_filter(permission_context: PermissionContext | dict[str, Any] | None) -> dict[str, Any]:
+def _context_filter(permission_context: AuditContext | PermissionContext | dict[str, Any] | None) -> dict[str, Any]:
     if permission_context is None:
         return {}
-    raw = asdict(permission_context) if isinstance(permission_context, PermissionContext) else dict(permission_context)
+    raw = asdict(permission_context) if isinstance(permission_context, (AuditContext, PermissionContext)) else dict(permission_context)
     return {field: raw.get(field) for field in PERMISSION_FILTER_FIELDS if raw.get(field) not in {None, ""}}
 
 
-def item_matches_permission(item: dict[str, Any], permission_context: PermissionContext | dict[str, Any] | None) -> bool:
+def item_matches_permission(item: dict[str, Any], permission_context: AuditContext | PermissionContext | dict[str, Any] | None) -> bool:
     filters = _context_filter(permission_context)
     for field, expected in filters.items():
         actual = item.get(field)
@@ -49,9 +50,6 @@ def filter_dataset_by_permission(payload: dict[str, Any], permission_context: Pe
         if not isinstance(dataset, dict):
             continue
         rows = dataset.get("rows")
-        if isinstance(rows, list):
-            filtered_rows = filter_items_by_permission(rows, permission_context)
-        else:
-            filtered_rows = []
+        filtered_rows = filter_items_by_permission(rows, permission_context) if isinstance(rows, list) else []
         filtered_datasets.append({**dataset, "rows": filtered_rows})
     return {**payload, "datasets": filtered_datasets}

@@ -96,6 +96,7 @@ class PDMClient:
         enriched.setdefault("scope", audit_context.scope)
         enriched.setdefault("purpose", audit_context.purpose)
         enriched.setdefault("trace_id", audit_context.trace_id)
+        enriched.setdefault("source_system", audit_context.source_system)
         if audit_context.idempotency_key:
             enriched.setdefault("idempotency_key", audit_context.idempotency_key)
         return enriched

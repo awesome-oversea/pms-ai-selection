@@ -3,7 +3,6 @@ API router registration for v1 endpoints.
 """
 
 from fastapi import APIRouter
-
 from src.api.v1.endpoints import (
     agents,
     auth,
@@ -12,6 +11,7 @@ from src.api.v1.endpoints import (
     commercial,
     competitor,
     erp,
+    erp_domains,
     graph,
     health,
     integration,
@@ -40,6 +40,7 @@ api_router.include_router(llm.router, tags=["LLM"])
 api_router.include_router(bff.router, tags=["BFF"])
 api_router.include_router(integration.router, tags=["Integration"])
 api_router.include_router(erp.router, tags=["ERP六域服务"])
+api_router.include_router(erp_domains.router, tags=["ERP域集成"])
 api_router.include_router(market.router, tags=["Market"])
 api_router.include_router(market_insight.router, tags=["Market Insight"])
 api_router.include_router(competitor.router, tags=["Competitor"])

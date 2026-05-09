@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI选品系统 - 建议池管理</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .filter-bar { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem; padding:1rem; background:#f8f9fa; border-radius:8px; align-items:center; }
+        .filter-group { display:flex; align-items:center; gap:0.5rem; }
+        .filter-group label { font-weight:500; white-space:nowrap; }
+        .filter-group select, .filter-group input { padding:0.4rem 0.8rem; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem; }
+        .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+        .stat-card { background:#fff; padding:1.25rem; border-radius:12px; border-left:4px solid var(--primary); box-shadow:0 2px 4px rgba(0,0,0,0.08); }
+        .stat-card.stat-success { border-color:var(--success); }
+        .stat-card.stat-warning { border-color:var(--warning); }
+        .stat-card.stat-danger { border-color:var(--danger); }
+        .stat-value { font-size:1.75rem; font-weight:700; }
+        .stat-label { color:var(--gray-500); font-size:0.8rem; margin-top:0.25rem; }
+        .data-table { width:100%; border-collapse:collapse; }
+        .data-table th, .data-table td { padding:0.75rem 1rem; text-align:left; border-bottom:1px solid var(--gray-200); font-size:0.875rem; }
+        .data-table th { background:var(--gray-50); font-weight:600; color:var(--gray-700); position:sticky; top:0; }
+        .data-table tr:hover { background:var(--gray-50); }
+        .badge { display:inline-block; padding:0.2rem 0.6rem; border-radius:9999px; font-size:0.75rem; font-weight:600; }
+        .badge-suggested { background:#e0e7ff; color:#3730a3; }
+        .badge-pms_approved { background:#d1fae5; color:#065f46; }
+        .badge-pms_rejected { background:#fee2e2; color:#991b1b; }
+        .badge-erp_submitted { background:#fef3c7; color:#92400e; }
+        .badge-erp_approved { background:#a7f3d0; color:#065f46; }
+        .badge-erp_rejected { background:#fecaca; color:#991b1b; }
+        .badge-executed { background:#6ee7b7; color:#065f46; }
+        .badge-execution_failed { background:#fca5a5; color:#991b1b; }
+        .badge-closed { background:#e5e7eb; color:#374151; }
+        .badge-default { background:#f3f4f6; color:#4b5563; }
+        .priority-critical { color:#ef4444; font-weight:700; }
+        .priority-high { color:#f59e0b; font-weight:600; }
+        .priority-medium { color:#3b82f6; }
+        .priority-low { color:#6b7280; }
+        .btn { padding:0.4rem 0.8rem; border:none; border-radius:6px; cursor:pointer; font-size:0.8rem; transition:all 0.2s; }
+        .btn-primary { background:var(--primary); color:#fff; }
+        .btn-primary:hover { background:var(--primary-dark); }
+        .btn-success { background:var(--success); color:#fff; }
+        .btn-danger { background:var(--danger); color:#fff; }
+        .btn-outline { background:transparent; border:1px solid var(--gray-300); color:var(--gray-700); }
+        .btn-outline:hover { background:var(--gray-100); }
+        .btn-sm { padding:0.25rem 0.5rem; font-size:0.75rem; }
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center; }
+        .modal-overlay.active { display:flex; }
+        .modal { background:#fff; border-radius:12px; padding:2rem; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; }
+        .modal h3 { margin-bottom:1rem; }
+        .modal-actions { display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1.5rem; }
+        .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; }
+        .detail-item label { display:block; font-size:0.75rem; color:var(--gray-500); margin-bottom:0.2rem; }
+        .detail-item span { font-size:0.875rem; font-weight:500; }
+        .pagination { display:flex; justify-content:center; gap:0.5rem; margin-top:1rem; }
+        .empty-state { text-align:center; padding:3rem; color:var(--gray-500); }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🎯 AI选品系统</div>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/selection">选品任务</a>
+            <a href="/approval">审批管理</a>
+            <a href="/recommendations" class="active">建议池</a>
+            <a href="/ads-optimization">广告优化</a>
+            <a href="/fba-restock">FBA补货</a>
+            <a href="/ai-insights">AI洞察</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>📋 建议池管理</h1>
+            <p class="subtitle">PMS建议全生命周期管理 — 创建、审批、提交ERP、执行反馈闭环</p>
+        </div>
+
+        <div class="stats-row" id="statsRow">
+            <div class="stat-card"><div class="stat-value" id="statTotal">-</div><div class="stat-label">总建议数</div></div>
+            <div class="stat-card stat-warning"><div class="stat-value" id="statPending">-</div><div class="stat-label">待审批</div></div>
+            <div class="stat-card stat-success"><div class="stat-value" id="statApproved">-</div><div class="stat-label">已批准</div></div>
+            <div class="stat-card"><div class="stat-value" id="statExecuted">-</div><div class="stat-label">已执行</div></div>
+            <div class="stat-card stat-danger"><div class="stat-value" id="statFailed">-</div><div class="stat-label">执行失败</div></div>
+        </div>
+
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label>建议类别:</label>
+                <select id="filterCategory">
+                    <option value="">全部</option>
+                    <option value="selection">选品</option>
+                    <option value="pricing">定价</option>
+                    <option value="restock">补货</option>
+                    <option value="ad_optimization">广告优化</option>
+                    <option value="risk_alert">风控预警</option>
+                    <option value="inventory_prediction">库存预测</option>
+                    <option value="sentiment_insight">情感洞察</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>执行状态:</label>
+                <select id="filterState">
+                    <option value="">全部</option>
+                    <option value="suggested">已建议</option>
+                    <option value="pms_approved">PMS已批准</option>
+                    <option value="pms_rejected">PMS已拒绝</option>
+                    <option value="erp_submitted">已提交ERP</option>
+                    <option value="erp_approved">ERP已批准</option>
+                    <option value="erp_rejected">ERP已拒绝</option>
+                    <option value="scm_reviewing">SCM审核中</option>
+                    <option value="executed">已执行</option>
+                    <option value="execution_failed">执行失败</option>
+                    <option value="closed">已关闭</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>目标域:</label>
+                <select id="filterDomain">
+                    <option value="">全部</option>
+                    <option value="ads">ADS广告</option>
+                    <option value="fba">FBA海外仓</option>
+                    <option value="scm">SCM供应链</option>
+                    <option value="wms">WMS仓储</option>
+                    <option value="oms">OMS订单</option>
+                    <option value="tms">TMS物流</option>
+                    <option value="crm">CRM客服</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>优先级:</label>
+                <select id="filterPriority">
+                    <option value="">全部</option>
+                    <option value="critical">紧急</option>
+                    <option value="high">高</option>
+                    <option value="medium">中</option>
+                    <option value="low">低</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="loadRecommendations()">查询</button>
+            <button class="btn btn-outline" onclick="resetFilters()">重置</button>
+        </div>
+
+        <section class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>建议ID</th>
+                        <th>标题</th>
+                        <th>类别</th>
+                        <th>目标域</th>
+                        <th>优先级</th>
+                        <th>执行状态</th>
+                        <th>置信度</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="recommendationsBody">
+                    <tr><td colspan="9" class="empty-state">加载中...</td></tr>
+                </tbody>
+            </table>
+            <div class="pagination" id="pagination"></div>
+        </section>
+    </main>
+
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal">
+            <h3>📋 建议详情</h3>
+            <div class="detail-grid" id="detailContent"></div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+                <button class="btn btn-success" id="btnApprove" onclick="handleApprove()">批准</button>
+                <button class="btn btn-danger" id="btnReject" onclick="handleReject()">拒绝</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="rejectModal">
+        <div class="modal">
+            <h3>❌ 拒绝建议</h3>
+            <div style="margin:1rem 0;">
+                <label style="display:block;margin-bottom:0.5rem;font-weight:500;">拒绝原因:</label>
+                <textarea id="rejectReason" rows="4" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;" placeholder="请输入拒绝原因..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeRejectModal()">取消</button>
+                <button class="btn btn-danger" onclick="confirmReject()">确认拒绝</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/erp_domains_api.js"></script>
+    <script>
+        let currentRecommendation = null;
+        let currentPage = 0;
+        const PAGE_SIZE = 20;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStatistics();
+            loadRecommendations();
+        });
+
+        async function loadStatistics() {
+            try {
+                const stats = await ErpDomainsAPI.getRecommendationStatistics();
+                document.getElementById('statTotal').textContent = stats.total || 0;
+                document.getElementById('statPending').textContent = stats.by_state?.suggested || 0;
+                document.getElementById('statApproved').textContent = (stats.by_state?.pms_approved || 0) + (stats.by_state?.erp_approved || 0);
+                document.getElementById('statExecuted').textContent = stats.by_state?.executed || 0;
+                document.getElementById('statFailed').textContent = stats.by_state?.execution_failed || 0;
+            } catch (e) {
+                console.error('加载统计失败:', e);
+            }
+        }
+
+        async function loadRecommendations(page = 0) {
+            currentPage = page;
+            const params = {
+                limit: PAGE_SIZE,
+                offset: page * PAGE_SIZE,
+            };
+            const category = document.getElementById('filterCategory').value;
+            const state = document.getElementById('filterState').value;
+            const domain = document.getElementById('filterDomain').value;
+            const priority = document.getElementById('filterPriority').value;
+            if (category) params.category = category;
+            if (state) params.execution_state = state;
+            if (domain) params.target_domain = domain;
+            if (priority) params.priority = priority;
+
+            try {
+                const data = await ErpDomainsAPI.listRecommendations(params);
+                const items = data.items || data.recommendations || [];
+                const total = data.total || items.length;
+                renderTable(items);
+                renderPagination(total);
+            } catch (e) {
+                document.getElementById('recommendationsBody').innerHTML =
+                    `<tr><td colspan="9" class="empty-state" style="color:var(--danger);">加载失败: ${escapeHtml(e.message)}</td></tr>`;
+            }
+        }
+
+        function renderTable(items) {
+            const tbody = document.getElementById('recommendationsBody');
+            if (!items.length) {
+                tbody.innerHTML = '<tr><td colspan="9" class="empty-state">暂无建议数据</td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.map(r => `
+                <tr>
+                    <td><code>${(r.id || '').substring(0, 8)}...</code></td>
+                    <td>${escapeHtml(r.title || '-').substring(0, 40)}</td>
+                    <td>${escapeHtml(r.category || '-')}</td>
+                    <td>${escapeHtml(r.target_domain || '-')}</td>
+                    <td><span class="priority-${r.priority || 'medium'}">${escapeHtml(r.priority || '-')}</span></td>
+                    <td><span class="badge badge-${r.execution_state || 'default'}">${formatState(r.execution_state)}</span></td>
+                    <td>${r.confidence != null ? (r.confidence * 100).toFixed(1) + '%' : '-'}</td>
+                    <td>${formatTime(r.created_at)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline" onclick="showDetail('${r.id}')">详情</button>
+                        ${r.execution_state === 'suggested' ? `<button class="btn btn-sm btn-success" onclick="quickApprove('${r.id}')">批准</button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function formatState(state) {
+            const map = {
+                suggested: '已建议', pms_approved: 'PMS批准', pms_rejected: 'PMS拒绝',
+                erp_submitted: '已提交ERP', erp_approved: 'ERP批准', erp_rejected: 'ERP拒绝',
+                erp_draft_created: 'ERP草稿', erp_pending_review: 'ERP待审',
+                scm_reviewing: 'SCM审核', scm_approved: 'SCM批准', scm_rejected: 'SCM拒绝',
+                scm_ordered: 'SCM已下单', wms_reserved: 'WMS已预留', wms_confirmed: 'WMS已确认',
+                oms_draft_created: 'OMS草稿', oms_published: 'OMS已发布', oms_active: 'OMS生效中',
+                executed: '已执行', partially_executed: '部分执行', execution_failed: '执行失败', closed: '已关闭',
+            };
+            return map[state] || state || '-';
+        }
+
+        function renderPagination(total) {
+            const pages = Math.ceil(total / PAGE_SIZE);
+            if (pages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+            let html = '';
+            for (let i = 0; i < Math.min(pages, 10); i++) {
+                html += `<button class="btn btn-sm ${i === currentPage ? 'btn-primary' : 'btn-outline'}" onclick="loadRecommendations(${i})">${i + 1}</button>`;
+            }
+            if (pages > 10) html += `<span style="padding:0 0.5rem;">...</span><span style="color:var(--gray-500);font-size:0.8rem;">共${total}条</span>`;
+            document.getElementById('pagination').innerHTML = html;
+        }
+
+        async function showDetail(id) {
+            try {
+                const r = await ErpDomainsAPI.getRecommendation(id);
+                currentRecommendation = r;
+                const content = document.getElementById('detailContent');
+                content.innerHTML = `
+                    <div class="detail-item"><label>建议ID</label><span>${escapeHtml(r.id)}</span></div>
+                    <div class="detail-item"><label>标题</label><span>${escapeHtml(r.title)}</span></div>
+                    <div class="detail-item"><label>类别</label><span>${escapeHtml(r.category)}</span></div>
+                    <div class="detail-item"><label>目标域</label><span>${escapeHtml(r.target_domain)}</span></div>
+                    <div class="detail-item"><label>优先级</label><span class="priority-${r.priority}">${escapeHtml(r.priority)}</span></div>
+                    <div class="detail-item"><label>执行状态</label><span class="badge badge-${r.execution_state}">${formatState(r.execution_state)}</span></div>
+                    <div class="detail-item"><label>置信度</label><span>${r.confidence != null ? (r.confidence * 100).toFixed(1) + '%' : '-'}</span></div>
+                    <div class="detail-item"><label>AI评分</label><span>${r.score != null ? r.score.toFixed(1) : '-'}</span></div>
+                    <div class="detail-item"><label>ERP引用ID</label><span>${escapeHtml(r.erp_ref_id || '-')}</span></div>
+                    <div class="detail-item"><label>创建时间</label><span>${formatTime(r.created_at)}</span></div>
+                    <div class="detail-item" style="grid-column:span 2"><label>描述</label><span>${escapeHtml(r.description || '-')}</span></div>
+                    ${r.rejection_reason ? `<div class="detail-item" style="grid-column:span 2"><label>拒绝原因</label><span style="color:var(--danger)">${escapeHtml(r.rejection_reason)}</span></div>` : ''}
+                    ${r.feedback ? `<div class="detail-item" style="grid-column:span 2"><label>执行反馈</label><span><pre style="font-size:0.8rem;white-space:pre-wrap;">${escapeHtml(JSON.stringify(r.feedback, null, 2))}</pre></span></div>` : ''}
+                `;
+                const canApprove = r.execution_state === 'suggested';
+                const canReject = r.execution_state === 'suggested';
+                document.getElementById('btnApprove').style.display = canApprove ? '' : 'none';
+                document.getElementById('btnReject').style.display = canReject ? '' : 'none';
+                document.getElementById('detailModal').classList.add('active');
+            } catch (e) {
+                showToast('加载详情失败: ' + e.message, 'error');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('active');
+            currentRecommendation = null;
+        }
+
+        async function quickApprove(id) {
+            try {
+                await ErpDomainsAPI.approveRecommendation(id, '通过建议池页面快速批准');
+                showToast('批准成功', 'success');
+                loadRecommendations(currentPage);
+                loadStatistics();
+            } catch (e) {
+                showToast('批准失败: ' + e.message, 'error');
+            }
+        }
+
+        async function handleApprove() {
+            if (!currentRecommendation) return;
+            try {
+                await ErpDomainsAPI.approveRecommendation(currentRecommendation.id, '通过详情页面批准');
+                showToast('批准成功', 'success');
+                closeModal();
+                loadRecommendations(currentPage);
+                loadStatistics();
+            } catch (e) {
+                showToast('批准失败: ' + e.message, 'error');
+            }
+        }
+
+        function handleReject() {
+            document.getElementById('rejectModal').classList.add('active');
+        }
+
+        function closeRejectModal() {
+            document.getElementById('rejectModal').classList.remove('active');
+        }
+
+        async function confirmReject() {
+            if (!currentRecommendation) return;
+            const reason = document.getElementById('rejectReason').value.trim();
+            if (!reason) { showToast('请输入拒绝原因', 'warning'); return; }
+            try {
+                await ErpDomainsAPI.rejectRecommendation(currentRecommendation.id, reason);
+                showToast('已拒绝', 'success');
+                closeRejectModal();
+                closeModal();
+                loadRecommendations(currentPage);
+                loadStatistics();
+            } catch (e) {
+                showToast('拒绝失败: ' + e.message, 'error');
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('filterCategory').value = '';
+            document.getElementById('filterState').value = '';
+            document.getElementById('filterDomain').value = '';
+            document.getElementById('filterPriority').value = '';
+            loadRecommendations(0);
+        }
+    </script>
+</body>
+</html>

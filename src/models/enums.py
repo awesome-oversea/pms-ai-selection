@@ -14,10 +14,10 @@
     ERPSystemType: ERP系统类型
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     """
     选品任务生命周期状态。
 
@@ -46,7 +46,7 @@ class TaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class TaskPriority(str, Enum):
+class TaskPriority(StrEnum):
     """
     任务优先级。
 
@@ -60,7 +60,7 @@ class TaskPriority(str, Enum):
     URGENT = "urgent"
 
 
-class AgentType(str, Enum):
+class AgentType(StrEnum):
     """
     AI Agent类型定义。
 
@@ -77,7 +77,7 @@ class AgentType(str, Enum):
     COMMERCIALIZATION = "commercialization"
 
 
-class AgentStatus(str, Enum):
+class AgentStatus(StrEnum):
     """
     Agent运行状态。
 
@@ -93,7 +93,7 @@ class AgentStatus(str, Enum):
     TIMEOUT = "timeout"
 
 
-class ReportType(str, Enum):
+class ReportType(StrEnum):
     """
     报告类型枚举。
 
@@ -106,7 +106,7 @@ class ReportType(str, Enum):
     CUSTOM = "custom"
 
 
-class ERPSystemType(str, Enum):
+class ERPSystemType(StrEnum):
     """
     ERP系统集成类型。
 
@@ -131,7 +131,7 @@ class ERPSystemType(str, Enum):
     MS = "ms"
 
 
-class RecommendationExecutionState(str, Enum):
+class RecommendationExecutionState(StrEnum):
     """
     建议执行13态状态机。
 
@@ -153,6 +153,10 @@ class RecommendationExecutionState(str, Enum):
     PMS_APPROVED = "pms_approved"
     PMS_REJECTED = "pms_rejected"
     ERP_SUBMITTED = "erp_submitted"
+    ERP_APPROVED = "erp_approved"
+    ERP_REJECTED = "erp_rejected"
+    ERP_DRAFT_CREATED = "erp_draft_created"
+    ERP_PENDING_REVIEW = "erp_pending_review"
     SCM_REVIEWING = "scm_reviewing"
     SCM_APPROVED = "scm_approved"
     SCM_REJECTED = "scm_rejected"
@@ -162,29 +166,110 @@ class RecommendationExecutionState(str, Enum):
     OMS_DRAFT_CREATED = "oms_draft_created"
     OMS_PUBLISHED = "oms_published"
     OMS_ACTIVE = "oms_active"
+    EXECUTED = "executed"
+    PARTIALLY_EXECUTED = "partially_executed"
     EXECUTION_FAILED = "execution_failed"
     CLOSED = "closed"
 
 
-class ERPDomainType(str, Enum):
+class RecommendationCategory(StrEnum):
     """
-    ERP六域服务类型。
+    PMS建议类别。
 
-    对应 ERP 六域服务化拆分:
-    - MS: 商品主数据服务 (Master Service)
-    - SCM: 供应链管理 (Supply Chain Management)
-    - WMS: 仓储管理 (Warehouse Management System)
-    - OMS: 订单管理 (Order Management System)
-    - CRM: 客户关系管理 (Customer Relationship Management)
-    - BI: 商业智能 (Business Intelligence)
+    对应ERP 14域中PMS可输出的建议类型。
     """
 
-    MS = "ms"
+    SELECTION = "selection"
+    PRICING = "pricing"
+    RESTOCK = "restock"
+    AD_OPTIMIZATION = "ad_optimization"
+    RISK_ALERT = "risk_alert"
+    LISTING_DRAFT = "listing_draft"
+    PURCHASE_DRAFT = "purchase_draft"
+    INVENTORY_PREDICTION = "inventory_prediction"
+    SENTIMENT_INSIGHT = "sentiment_insight"
+    LOGISTICS_RISK = "logistics_risk"
+    PROFIT_INSIGHT = "profit_insight"
+
+
+class RecommendationPriority(StrEnum):
+    """
+    建议优先级。
+    """
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class DataCredibilityLevel(StrEnum):
+    """
+    数据可信等级。
+
+    V9交叉验证新增：为每类数据源定义可信等级。
+    """
+
+    A = "a"
+    B = "b"
+    C = "c"
+    D = "d"
+
+
+class AIFeatureToggle(StrEnum):
+    """
+    AI功能开关枚举。
+
+    按ERP域控制AI增强功能的启用/禁用。
+    """
+
+    AI_SELECTION = "ai_selection"
+    AI_PRICING = "ai_pricing"
+    AI_RESTOCK = "ai_restock"
+    AI_AD_OPTIMIZATION = "ai_ad_optimization"
+    AI_RISK_SCORING = "ai_risk_scoring"
+    AI_SENTIMENT = "ai_sentiment"
+    AI_INVENTORY_PREDICTION = "ai_inventory_prediction"
+    AI_LOGISTICS_RISK = "ai_logistics_risk"
+    AI_PROFIT_INSIGHT = "ai_profit_insight"
+
+
+class ERPDomainType(StrEnum):
+    """
+    ERP 14域服务类型。
+
+    对应 ERP 14域服务化拆分:
+    - DASHBOARD: 工作台域 (AI看板)
+    - IAM: 组织权限域
+    - PDM: 产品开发域 (AI选品)
+    - SOM: 销售运营域
+    - ADS: 广告管理域 (AI优化)
+    - OMS: 订单域 (AI风控)
+    - SCM: 供应链域 (AI补货)
+    - WMS: 仓储域 (AI预测)
+    - FBA: FBA/海外仓域
+    - TMS: 物流域
+    - CRM: 客服售后域 (AI情感)
+    - FMS: 财务域
+    - BI: 商业智能域 (KPI)
+    - SYS: 系统设置域
+    """
+
+    DASHBOARD = "dashboard"
+    IAM = "iam"
+    PDM = "pdm"
+    SOM = "som"
+    ADS = "ads"
+    OMS = "oms"
     SCM = "scm"
     WMS = "wms"
-    OMS = "oms"
+    FBA = "fba"
+    TMS = "tms"
     CRM = "crm"
+    FMS = "fms"
     BI = "bi"
+    SYS = "sys"
+    MS = "ms"
 
 
 _TRANSITIONS: dict[RecommendationExecutionState, set[RecommendationExecutionState]] = {
@@ -198,7 +283,26 @@ _TRANSITIONS: dict[RecommendationExecutionState, set[RecommendationExecutionStat
     },
     RecommendationExecutionState.PMS_REJECTED: set(),
     RecommendationExecutionState.ERP_SUBMITTED: {
+        RecommendationExecutionState.ERP_APPROVED,
+        RecommendationExecutionState.ERP_REJECTED,
+        RecommendationExecutionState.ERP_DRAFT_CREATED,
+        RecommendationExecutionState.ERP_PENDING_REVIEW,
         RecommendationExecutionState.SCM_REVIEWING,
+        RecommendationExecutionState.EXECUTION_FAILED,
+    },
+    RecommendationExecutionState.ERP_APPROVED: {
+        RecommendationExecutionState.SCM_REVIEWING,
+        RecommendationExecutionState.EXECUTED,
+        RecommendationExecutionState.EXECUTION_FAILED,
+    },
+    RecommendationExecutionState.ERP_REJECTED: set(),
+    RecommendationExecutionState.ERP_DRAFT_CREATED: {
+        RecommendationExecutionState.ERP_PENDING_REVIEW,
+        RecommendationExecutionState.EXECUTION_FAILED,
+    },
+    RecommendationExecutionState.ERP_PENDING_REVIEW: {
+        RecommendationExecutionState.ERP_APPROVED,
+        RecommendationExecutionState.ERP_REJECTED,
         RecommendationExecutionState.EXECUTION_FAILED,
     },
     RecommendationExecutionState.SCM_REVIEWING: {
@@ -232,6 +336,14 @@ _TRANSITIONS: dict[RecommendationExecutionState, set[RecommendationExecutionStat
         RecommendationExecutionState.EXECUTION_FAILED,
     },
     RecommendationExecutionState.OMS_ACTIVE: {
+        RecommendationExecutionState.CLOSED,
+    },
+    RecommendationExecutionState.EXECUTED: {
+        RecommendationExecutionState.CLOSED,
+    },
+    RecommendationExecutionState.PARTIALLY_EXECUTED: {
+        RecommendationExecutionState.EXECUTED,
+        RecommendationExecutionState.EXECUTION_FAILED,
         RecommendationExecutionState.CLOSED,
     },
     RecommendationExecutionState.EXECUTION_FAILED: {

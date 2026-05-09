@@ -91,3 +91,43 @@ async def result_view(request: Request, task_id: str):
 async def agent_monitor(request: Request):
     """Agent监控面板已切换到 Next.js 正式入口。"""
     return RedirectResponse(url="/agents", status_code=307)
+
+
+@router.get("/recommendations", response_class=HTMLResponse)
+async def recommendations_page(request: Request):
+    """建议池管理页面。"""
+    return _render(
+        "recommendations.html",
+        request=request,
+        page_title="AI选品系统 - 建议池管理",
+    )
+
+
+@router.get("/ads-optimization", response_class=HTMLResponse)
+async def ads_optimization_page(request: Request):
+    """广告优化页面。"""
+    return _render(
+        "ads_optimization.html",
+        request=request,
+        page_title="AI选品系统 - 广告优化",
+    )
+
+
+@router.get("/fba-restock", response_class=HTMLResponse)
+async def fba_restock_page(request: Request):
+    """FBA补货建议页面。"""
+    return _render(
+        "fba_restock.html",
+        request=request,
+        page_title="AI选品系统 - FBA补货",
+    )
+
+
+@router.get("/ai-insights", response_class=HTMLResponse)
+async def ai_insights_page(request: Request):
+    """AI洞察中心页面。"""
+    return _render(
+        "ai_insights.html",
+        request=request,
+        page_title="AI选品系统 - AI洞察",
+    )

@@ -64,7 +64,79 @@ class PermissionContext:
             raise PermissionError("tenant mismatch")
 
 
-AuditContext = PermissionContext
+@dataclass(frozen=True)
+class AuditContext(PermissionContext):
+    source_system: str = "pms"
+
+    @classmethod
+    def from_actor(cls, actor: dict[str, Any] | None, **overrides: Any) -> AuditContext:
+        payload = actor or {}
+        tenant_id = overrides.get("tenant_id") or payload.get("tenant_id")
+        actor_id = overrides.get("actor_id") or payload.get("user_id") or payload.get("sub") or payload.get("username")
+        if not tenant_id:
+            raise ValueError("tenant_id is required")
+        if not actor_id:
+            raise ValueError("actor_id is required")
+        data = {
+            "tenant_id": str(tenant_id),
+            "actor_type": str(overrides.get("actor_type") or payload.get("actor_type") or "user"),
+            "actor_id": str(actor_id),
+            "scope": str(overrides.get("scope") or payload.get("scope") or "tenant"),
+            "purpose": str(overrides.get("purpose") or payload.get("purpose") or "pms_operation"),
+            "trace_id": str(overrides.get("trace_id") or payload.get("trace_id") or payload.get("request_id") or "no-trace"),
+            "idempotency_key": overrides.get("idempotency_key") or payload.get("idempotency_key"),
+            "org_id": overrides.get("org_id") or payload.get("org_id"),
+            "department_id": overrides.get("department_id") or payload.get("department_id"),
+            "store_id": overrides.get("store_id") or payload.get("store_id"),
+            "marketplace": overrides.get("marketplace") or payload.get("marketplace"),
+            "channel": overrides.get("channel") or payload.get("channel"),
+            "warehouse_id": overrides.get("warehouse_id") or payload.get("warehouse_id"),
+            "supplier_id": overrides.get("supplier_id") or payload.get("supplier_id"),
+            "category_id": overrides.get("category_id") or payload.get("category_id"),
+            "data_level": str(overrides.get("data_level") or payload.get("data_level") or "internal"),
+            "source_system": str(overrides.get("source_system") or payload.get("source_system") or "pms"),
+        }
+        return cls(**data)  # type: ignore[arg-type]
+
+    @classmethod
+    def from_permission_context(cls, ctx: PermissionContext, *, source_system: str = "pms") -> AuditContext:
+        data = asdict(ctx)
+        data["source_system"] = source_system
+        return cls(**data)  # type: ignore[arg-type]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tenant_id": self.tenant_id,
+            "actor_id": self.actor_id,
+            "actor_type": self.actor_type,
+            "scope": self.scope,
+            "purpose": self.purpose,
+            "trace_id": self.trace_id,
+            "source_system": self.source_system,
+            "idempotency_key": self.idempotency_key,
+            "org_id": self.org_id,
+            "department_id": self.department_id,
+            "store_id": self.store_id,
+            "marketplace": self.marketplace,
+            "channel": self.channel,
+            "warehouse_id": self.warehouse_id,
+            "supplier_id": self.supplier_id,
+            "category_id": self.category_id,
+            "data_level": self.data_level,
+        }
+
+    def validate_for_erp_call(self) -> None:
+        required = ["tenant_id", "actor_type", "actor_id", "scope", "purpose", "trace_id", "source_system"]
+        missing = [f for f in required if not getattr(self, f, None)]
+        if missing:
+            raise ValueError(f"AuditContext missing required fields for ERP call: {', '.join(missing)}")
+
+    def validate_for_write(self) -> None:
+        self.validate_for_erp_call()
+        if not self.idempotency_key:
+            raise ValueError("AuditContext idempotency_key is required for write operations")
+        if self.actor_type not in {"user", "service"}:
+            raise ValueError(f"AuditContext actor_type must be 'user' or 'service', got: {self.actor_type}")
 
 
 ERP_14_DOMAINS: tuple[ERPSystemType, ...] = (
@@ -230,6 +302,8 @@ class SuggestionStatus(StrEnum):
     ROLLED_BACK = "rolled_back"
     MEASURED = "measured"
     REVIEWED = "reviewed"
+    EXPIRED = "expired"
+    DISCARDED = "discarded"
 
 
 SUGGESTION_STATUS_CONTROLLER: dict[SuggestionStatus, str] = {
@@ -248,13 +322,15 @@ SUGGESTION_STATUS_CONTROLLER: dict[SuggestionStatus, str] = {
     SuggestionStatus.ROLLED_BACK: "erp",
     SuggestionStatus.MEASURED: "erp_bi",
     SuggestionStatus.REVIEWED: "pms",
+    SuggestionStatus.EXPIRED: "system",
+    SuggestionStatus.DISCARDED: "user",
 }
 
 
 ALLOWED_SUGGESTION_TRANSITIONS: dict[SuggestionStatus, set[SuggestionStatus]] = {
-    SuggestionStatus.CREATED: {SuggestionStatus.SCORED, SuggestionStatus.SUBMITTED, SuggestionStatus.REJECTED},
-    SuggestionStatus.SCORED: {SuggestionStatus.SUBMITTED, SuggestionStatus.REJECTED},
-    SuggestionStatus.SUBMITTED: {SuggestionStatus.ACCEPTED, SuggestionStatus.REJECTED},
+    SuggestionStatus.CREATED: {SuggestionStatus.SCORED, SuggestionStatus.DISCARDED},
+    SuggestionStatus.SCORED: {SuggestionStatus.SUBMITTED, SuggestionStatus.DISCARDED},
+    SuggestionStatus.SUBMITTED: {SuggestionStatus.ACCEPTED, SuggestionStatus.REJECTED, SuggestionStatus.EXPIRED},
     SuggestionStatus.ACCEPTED: {SuggestionStatus.PENDING_APPROVAL, SuggestionStatus.REJECTED},
     SuggestionStatus.PENDING_APPROVAL: {SuggestionStatus.APPROVED, SuggestionStatus.APPROVAL_REJECTED},
     SuggestionStatus.APPROVAL_REJECTED: set(),
@@ -263,10 +339,12 @@ ALLOWED_SUGGESTION_TRANSITIONS: dict[SuggestionStatus, set[SuggestionStatus]] = 
     SuggestionStatus.EXECUTING: {SuggestionStatus.PARTIALLY_EXECUTED, SuggestionStatus.EXECUTED, SuggestionStatus.FAILED},
     SuggestionStatus.PARTIALLY_EXECUTED: {SuggestionStatus.EXECUTED, SuggestionStatus.FAILED},
     SuggestionStatus.EXECUTED: {SuggestionStatus.MEASURED, SuggestionStatus.ROLLED_BACK},
-    SuggestionStatus.FAILED: {SuggestionStatus.SUBMITTED},
-    SuggestionStatus.ROLLED_BACK: {SuggestionStatus.MEASURED},
+    SuggestionStatus.FAILED: {SuggestionStatus.ROLLED_BACK, SuggestionStatus.SUBMITTED},
+    SuggestionStatus.ROLLED_BACK: set(),
     SuggestionStatus.MEASURED: {SuggestionStatus.REVIEWED},
     SuggestionStatus.REVIEWED: set(),
+    SuggestionStatus.EXPIRED: set(),
+    SuggestionStatus.DISCARDED: set(),
 }
 
 
@@ -275,8 +353,9 @@ class SuggestionLifecycle:
     suggestion_id: str
     status: SuggestionStatus = SuggestionStatus.CREATED
     audit_log: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def transition(self, next_status: SuggestionStatus | str, context: PermissionContext, reason: str | None = None) -> dict[str, Any]:
+    def transition(self, next_status: SuggestionStatus | str, context: AuditContext, reason: str | None = None) -> dict[str, Any]:
         target = next_status if isinstance(next_status, SuggestionStatus) else SuggestionStatus(str(next_status))
         allowed = ALLOWED_SUGGESTION_TRANSITIONS[self.status]
         if target not in allowed:
@@ -291,6 +370,7 @@ class SuggestionLifecycle:
             "actor_id": context.actor_id,
             "tenant_id": context.tenant_id,
             "trace_id": context.trace_id,
+            "source_system": context.source_system,
             "reason": reason,
             "controller": SUGGESTION_STATUS_CONTROLLER[target],
             "changed_at": datetime.now(UTC).isoformat(),

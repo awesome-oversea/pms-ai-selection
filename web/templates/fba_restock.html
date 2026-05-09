@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI选品系统 - FBA补货</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+        .form-group { margin-bottom:1rem; }
+        .form-group label { display:block; font-weight:500; margin-bottom:0.3rem; font-size:0.875rem; color:var(--gray-700); }
+        .form-group input, .form-group select { width:100%; padding:0.5rem 0.75rem; border:1px solid var(--gray-300); border-radius:6px; font-size:0.875rem; }
+        .btn { padding:0.5rem 1.25rem; border:none; border-radius:6px; cursor:pointer; font-size:0.875rem; transition:all 0.2s; }
+        .btn-primary { background:var(--primary); color:#fff; }
+        .btn-primary:hover { background:var(--primary-dark); }
+        .btn-outline { background:transparent; border:1px solid var(--gray-300); color:var(--gray-700); }
+        .btn-success { background:var(--success); color:#fff; }
+        .btn-danger { background:var(--danger); color:#fff; }
+        .btn-sm { padding:0.3rem 0.6rem; font-size:0.8rem; }
+        .card { background:#fff; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.08); padding:1.5rem; margin-bottom:1.5rem; }
+        .card h3 { margin-bottom:1rem; font-size:1.1rem; }
+        .tabs { display:flex; gap:0; border-bottom:2px solid var(--gray-200); margin-bottom:1.5rem; }
+        .tab { padding:0.75rem 1.5rem; cursor:pointer; font-weight:500; color:var(--gray-500); border-bottom:2px solid transparent; margin-bottom:-2px; transition:all 0.2s; }
+        .tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+        .tab:hover { color:var(--primary); }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+        .result-card { background:var(--gray-50); border-radius:8px; padding:1rem; margin-top:1rem; }
+        .metric-row { display:flex; gap:1rem; flex-wrap:wrap; margin:0.5rem 0; }
+        .metric-item { background:#fff; padding:0.75rem 1rem; border-radius:6px; border-left:3px solid var(--primary); flex:1; min-width:120px; }
+        .metric-value { font-size:1.25rem; font-weight:700; }
+        .metric-label { font-size:0.75rem; color:var(--gray-500); }
+        .urgency-critical { color:#ef4444; font-weight:700; }
+        .urgency-high { color:#f59e0b; font-weight:600; }
+        .urgency-normal { color:#3b82f6; }
+        .urgency-low { color:#6b7280; }
+        .data-table { width:100%; border-collapse:collapse; }
+        .data-table th, .data-table td { padding:0.6rem 0.8rem; text-align:left; border-bottom:1px solid var(--gray-200); font-size:0.85rem; }
+        .data-table th { background:var(--gray-50); font-weight:600; }
+        .batch-item { background:var(--gray-50); border-radius:8px; padding:1rem; margin-bottom:0.75rem; border:1px solid var(--gray-200); }
+        .batch-item h4 { margin-bottom:0.5rem; font-size:0.9rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🎯 AI选品系统</div>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/selection">选品任务</a>
+            <a href="/approval">审批管理</a>
+            <a href="/recommendations">建议池</a>
+            <a href="/ads-optimization">广告优化</a>
+            <a href="/fba-restock" class="active">FBA补货</a>
+            <a href="/ai-insights">AI洞察</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>📦 FBA补货建议</h1>
+            <p class="subtitle">AI驱动的FBA库存补货建议，基于销量预测和安全库存计算</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('single')">单品补货</div>
+            <div class="tab" onclick="switchTab('batch')">批量补货</div>
+        </div>
+
+        <div class="tab-content active" id="tab-single">
+            <div class="card">
+                <h3>📋 生成补货建议</h3>
+                <form id="restockForm" onsubmit="handleRestock(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>产品ID</label>
+                            <input type="text" id="restockProductId" placeholder="输入产品UUID">
+                        </div>
+                        <div class="form-group">
+                            <label>SKU</label>
+                            <input type="text" id="restockSku" placeholder="SKU编码">
+                        </div>
+                        <div class="form-group">
+                            <label>ASIN</label>
+                            <input type="text" id="restockAsin" placeholder="ASIN编码">
+                        </div>
+                        <div class="form-group">
+                            <label>FNSKU</label>
+                            <input type="text" id="restockFnsku" placeholder="FNSKU编码">
+                        </div>
+                        <div class="form-group">
+                            <label>当前库存</label>
+                            <input type="number" id="restockCurrentStock" min="0" placeholder="当前FBA库存">
+                        </div>
+                        <div class="form-group">
+                            <label>在途数量</label>
+                            <input type="number" id="restockInbound" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>日均销量</label>
+                            <input type="number" id="restockVelocity" step="0.1" min="0" placeholder="近30天日均销量">
+                        </div>
+                        <div class="form-group">
+                            <label>采购提前期(天)</label>
+                            <input type="number" id="restockLeadTime" min="1" value="30">
+                        </div>
+                        <div class="form-group">
+                            <label>市场平台</label>
+                            <select id="restockMarketplace">
+                                <option value="amazon_us">Amazon US</option>
+                                <option value="amazon_eu">Amazon EU</option>
+                                <option value="amazon_jp">Amazon JP</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">生成补货建议</button>
+                </form>
+                <div id="restockResult"></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-batch">
+            <div class="card">
+                <h3>📋 批量补货建议</h3>
+                <p style="color:var(--gray-500);margin-bottom:1rem;font-size:0.875rem;">为多个SKU同时生成补货建议</p>
+                <div id="batchItems">
+                    <div class="batch-item">
+                        <h4>商品 #1</h4>
+                        <div class="form-grid">
+                            <div class="form-group"><label>SKU</label><input type="text" class="batch-sku" placeholder="SKU"></div>
+                            <div class="form-group"><label>当前库存</label><input type="number" class="batch-stock" min="0" placeholder="0"></div>
+                            <div class="form-group"><label>日均销量</label><input type="number" class="batch-velocity" step="0.1" min="0" placeholder="0"></div>
+                            <div class="form-group"><label>采购提前期(天)</label><input type="number" class="batch-leadtime" min="1" value="30"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+                    <button class="btn btn-outline" onclick="addBatchItem()">+ 添加商品</button>
+                    <button class="btn btn-primary" onclick="handleBatchRestock()">批量生成建议</button>
+                </div>
+                <div id="batchResult"></div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/erp_domains_api.js"></script>
+    <script>
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + name).classList.add('active');
+        }
+
+        async function handleRestock(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = '生成中...';
+            try {
+                const result = await ErpDomainsAPI.generateRestock({
+                    product_id: document.getElementById('restockProductId').value || undefined,
+                    sku: document.getElementById('restockSku').value || undefined,
+                    asin: document.getElementById('restockAsin').value || undefined,
+                    fnsku: document.getElementById('restockFnsku').value || undefined,
+                    current_stock: parseInt(document.getElementById('restockCurrentStock').value) || undefined,
+                    inbound_quantity: parseInt(document.getElementById('restockInbound').value) || 0,
+                    daily_velocity: parseFloat(document.getElementById('restockVelocity').value) || undefined,
+                    lead_time_days: parseInt(document.getElementById('restockLeadTime').value) || 30,
+                    marketplace: document.getElementById('restockMarketplace').value,
+                });
+                renderRestockResult(result);
+                showToast('补货建议已生成', 'success');
+            } catch (err) {
+                document.getElementById('restockResult').innerHTML = `<div class="result-card" style="color:var(--danger)">生成失败: ${escapeHtml(err.message)}</div>`;
+            } finally {
+                btn.disabled = false; btn.textContent = '生成补货建议';
+            }
+        }
+
+        function renderRestockResult(r) {
+            document.getElementById('restockResult').innerHTML = `
+                <div class="result-card">
+                    <h4>✅ FBA补货建议</h4>
+                    <div class="metric-row">
+                        <div class="metric-item"><div class="metric-value urgency-${r.urgency || 'normal'}">${r.urgency || '-'}</div><div class="metric-label">紧急程度</div></div>
+                        <div class="metric-item"><div class="metric-value">${r.suggested_quantity || '-'}</div><div class="metric-label">建议补货数量</div></div>
+                        <div class="metric-item"><div class="metric-value">${r.days_of_supply != null ? r.days_of_supply.toFixed(1) + '天' : '-'}</div><div class="metric-label">可供货天数</div></div>
+                        <div class="metric-item"><div class="metric-value">${r.safety_stock || '-'}</div><div class="metric-label">安全库存</div></div>
+                        <div class="metric-item"><div class="metric-value">${r.confidence != null ? (r.confidence * 100).toFixed(1) + '%' : '-'}</div><div class="metric-label">置信度</div></div>
+                    </div>
+                    ${r.risk_flags && r.risk_flags.length ? `<div style="margin-top:0.75rem;"><strong>风险标识:</strong><ul style="margin-top:0.3rem;">${r.risk_flags.map(f => `<li style="color:var(--danger);font-size:0.85rem;">${escapeHtml(typeof f === 'string' ? f : JSON.stringify(f))}</li>`).join('')}</ul></div>` : ''}
+                </div>`;
+        }
+
+        let batchCount = 1;
+        function addBatchItem() {
+            batchCount++;
+            const div = document.createElement('div');
+            div.className = 'batch-item';
+            div.innerHTML = `<h4>商品 #${batchCount}</h4>
+                <div class="form-grid">
+                    <div class="form-group"><label>SKU</label><input type="text" class="batch-sku" placeholder="SKU"></div>
+                    <div class="form-group"><label>当前库存</label><input type="number" class="batch-stock" min="0" placeholder="0"></div>
+                    <div class="form-group"><label>日均销量</label><input type="number" class="batch-velocity" step="0.1" min="0" placeholder="0"></div>
+                    <div class="form-group"><label>采购提前期(天)</label><input type="number" class="batch-leadtime" min="1" value="30"></div>
+                </div>`;
+            document.getElementById('batchItems').appendChild(div);
+        }
+
+        async function handleBatchRestock() {
+            const items = [];
+            document.querySelectorAll('.batch-item').forEach(el => {
+                const sku = el.querySelector('.batch-sku').value;
+                if (sku) {
+                    items.push({
+                        sku,
+                        current_stock: parseInt(el.querySelector('.batch-stock').value) || 0,
+                        daily_velocity: parseFloat(el.querySelector('.batch-velocity').value) || 0,
+                        lead_time_days: parseInt(el.querySelector('.batch-leadtime').value) || 30,
+                    });
+                }
+            });
+            if (!items.length) { showToast('请至少添加一个商品', 'warning'); return; }
+            try {
+                const result = await ErpDomainsAPI.batchGenerateRestock(items);
+                let html = '<div class="result-card"><h4>✅ 批量补货建议</h4>';
+                const suggestions = result.suggestions || result.items || [result];
+                if (Array.isArray(suggestions)) {
+                    html += '<table class="data-table"><thead><tr><th>SKU</th><th>建议数量</th><th>可供货天数</th><th>紧急程度</th><th>置信度</th></tr></thead><tbody>';
+                    suggestions.forEach(s => {
+                        html += `<tr><td>${escapeHtml(s.sku || '-')}</td><td>${s.suggested_quantity || '-'}</td><td>${s.days_of_supply != null ? s.days_of_supply.toFixed(1) : '-'}</td><td class="urgency-${s.urgency || 'normal'}">${s.urgency || '-'}</td><td>${s.confidence != null ? (s.confidence * 100).toFixed(1) + '%' : '-'}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                }
+                html += '</div>';
+                document.getElementById('batchResult').innerHTML = html;
+                showToast('批量建议已生成', 'success');
+            } catch (err) {
+                document.getElementById('batchResult').innerHTML = `<div class="result-card" style="color:var(--danger)">批量生成失败: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

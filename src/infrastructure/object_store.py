@@ -28,7 +28,7 @@ class LocalObjectStore:
 
 
 def is_local_artifact_endpoint(api_endpoint: str) -> bool:
-    return api_endpoint.startswith("file://")
+    return api_endpoint.startswith("file://") or api_endpoint.startswith("local://")
 
 
 def _normalize_file_uri_path(api_endpoint: str) -> Path:

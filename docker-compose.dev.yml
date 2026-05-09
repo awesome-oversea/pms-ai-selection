@@ -6,7 +6,7 @@ services:
     command: ["postgres", "-c", "wal_level=logical", "-c", "max_wal_senders=10", "-c", "max_replication_slots=10"]
     environment:
       POSTGRES_USER: pms
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pms_dev_2024}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME}
       POSTGRES_DB: pms_db
     ports:
       - "${POSTGRES_HOST_PORT:-5432}:5432"
@@ -77,7 +77,7 @@ services:
     pull_policy: if_not_present
     container_name: pms-dev-neo4j
     environment:
-      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/pms_graph_dev}
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/CHANGE_ME}
       NEO4J_server_memory_heap_initial__size: ${NEO4J_HEAP_INIT:-512m}
       NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP_MAX:-512m}
       NEO4J_server_memory_pagecache_size: ${NEO4J_PAGECACHE:-512m}
@@ -89,7 +89,7 @@ services:
       - ${PMS_DATA_ROOT:-/data/pms}/neo4j/data:/data
       - ${PMS_DATA_ROOT:-/data/pms}/neo4j/logs:/logs
     healthcheck:
-      test: ["CMD-SHELL", "echo 'RETURN 1;' | /var/lib/neo4j/bin/cypher-shell -a bolt://127.0.0.1:7687 -u neo4j -p ${NEO4J_PASSWORD:-pms_graph_dev} --non-interactive >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "echo 'RETURN 1;' | /var/lib/neo4j/bin/cypher-shell -a bolt://127.0.0.1:7687 -u neo4j -p ${NEO4J_PASSWORD:-CHANGE_ME} --non-interactive >/dev/null 2>&1"]
       interval: 15s
       timeout: 20s
       start_period: 60s
@@ -109,7 +109,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
       APP_API_PREFIX: ${APP_API_PREFIX:-/api/v1}
-      DB_URL: postgresql+asyncpg://pms:${POSTGRES_PASSWORD:-pms_dev_2024}@postgres:5432/pms_db
+      DB_URL: postgresql+asyncpg://pms:${POSTGRES_PASSWORD:-CHANGE_ME}@postgres:5432/pms_db
       REDIS_URL: redis://redis:6379/0
       SEARCH_ENABLED: ${SEARCH_ENABLED:-true}
       SEARCH_BACKEND: ${SEARCH_BACKEND:-opensearch}

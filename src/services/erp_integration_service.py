@@ -10,7 +10,12 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.logging import get_logger
-from src.core.pms_governance import PermissionContext, validate_pms_write_boundary, validate_pms_write_object
+from src.core.pms_governance import (
+    AuditContext,
+    PermissionContext,
+    validate_pms_write_boundary,
+    validate_pms_write_object,
+)
 from src.infrastructure.bi_client import BIClient, BIClientError
 from src.infrastructure.crm_client import CRMClient, CRMClientError
 from src.infrastructure.fms_client import FMSClient, FMSClientError
@@ -1327,7 +1332,7 @@ class ErpIntegrationService:
         domain: str,
         purpose: str,
         task_id: str,
-    ) -> PermissionContext:
+    ) -> AuditContext:
         config = selection_task.config or {}
         actor_id = (
             self.actor.get("user_id")
@@ -1352,7 +1357,7 @@ class ErpIntegrationService:
             or self.actor.get("tenant_id")
             or (config.get("tenant_id") if isinstance(config, dict) else None)
         )
-        return PermissionContext.from_actor(
+        return AuditContext.from_actor(
             self.actor,
             tenant_id=tenant_id,
             actor_id=str(actor_id),
@@ -1371,7 +1376,7 @@ class ErpIntegrationService:
         )
 
     @staticmethod
-    def _attach_audit_context(payload: dict[str, Any], audit_context: PermissionContext) -> dict[str, Any]:
+    def _attach_audit_context(payload: dict[str, Any], audit_context: AuditContext) -> dict[str, Any]:
         enriched = dict(payload)
         context_payload = audit_context.to_filter()
         enriched["audit_context"] = context_payload
@@ -1381,6 +1386,7 @@ class ErpIntegrationService:
         enriched.setdefault("scope", audit_context.scope)
         enriched.setdefault("purpose", audit_context.purpose)
         enriched.setdefault("trace_id", audit_context.trace_id)
+        enriched.setdefault("source_system", audit_context.source_system)
         if audit_context.idempotency_key:
             enriched.setdefault("idempotency_key", audit_context.idempotency_key)
         return enriched

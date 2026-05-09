@@ -73,7 +73,7 @@ class BaseERPClient:
         headers = {
             "Content-Type": "application/json",
             "X-API-Key": self.api_key,
-            "X-PMS-Source-System": "pms",
+            "X-PMS-Source-System": audit_context.source_system,
             "X-PMS-Tenant-ID": audit_context.tenant_id,
             "X-PMS-Actor-Type": audit_context.actor_type,
             "X-PMS-Actor-ID": audit_context.actor_id,
@@ -110,6 +110,7 @@ class BaseERPClient:
                 "actor_type": audit_context.actor_type,
                 "actor_id": audit_context.actor_id,
                 "trace_id": audit_context.trace_id,
+                "source_system": audit_context.source_system,
                 "idempotency_key": audit_context.idempotency_key,
                 "result": result,
                 "attempt": attempt,
@@ -119,7 +120,7 @@ class BaseERPClient:
             }
         )
 
-    async def request(self, method: str, resource: str, *, audit_context: AuditContext, json_body: Any | None = None) -> dict[str, Any]:
+    async def request(self, method: str, resource: str, *, audit_context: AuditContext, json_body: Any | None = None, query_params: dict[str, str] | None = None) -> dict[str, Any]:
         path = self.build_path(resource)
         url = f"{self.base_url}{path}"
         headers = self.build_headers(method=method, path=path, audit_context=audit_context, body=json_body)
@@ -128,7 +129,7 @@ class BaseERPClient:
         for attempt in range(1, self.max_retries + 1):
             try:
                 async with httpx.AsyncClient(timeout=timeout) as client:
-                    response = await client.request(method.upper(), url, headers=headers, json=json_body)
+                    response = await client.request(method.upper(), url, headers=headers, json=json_body, params=query_params)
                     response.raise_for_status()
                 self.record_audit(method=method, path=path, audit_context=audit_context, result="success", attempt=attempt, status_code=response.status_code)
                 if not response.content:

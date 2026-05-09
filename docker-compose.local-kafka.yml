@@ -137,7 +137,7 @@ services:
     image: curlimages/curl:8.8.0
     container_name: pms-local-debezium-init
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pms_dev_2024}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME}
     depends_on:
       kafka-connect:
         condition: service_healthy

@@ -615,7 +615,7 @@ class SelectionTaskService:
 
             sales = ((feedback_snapshot.get("sales") or {}).get("orders") or {}) if isinstance((feedback_snapshot.get("sales") or {}).get("orders"), dict) else {}
             reviews = feedback_snapshot.get("reviews") if isinstance(feedback_snapshot.get("reviews"), dict) else {}
-            profit = feedback_snapshot.get("profit") if isinstance(feedback_snapshot.get("profit"), dict) else {}
+            _profit = feedback_snapshot.get("profit") if isinstance(feedback_snapshot.get("profit"), dict) else {}
             inventory = ((feedback_snapshot.get("inventory") or {}).get("summary") or {}) if isinstance((feedback_snapshot.get("inventory") or {}).get("summary"), dict) else {}
             execution_status = adoption.get("execution_status") if isinstance(adoption.get("execution_status"), dict) else {}
 
@@ -1390,6 +1390,7 @@ class SelectionTaskService:
         scm_name: str = "default",
         supplier_code: str | None = None,
         notes: str | None = None,
+        submit_to_erp: bool = True,
     ) -> dict[str, Any] | None:
         try:
             task_uuid = UUID(task_id)
@@ -1434,10 +1435,91 @@ class SelectionTaskService:
         await self.session.commit()
         await self.session.refresh(task)
 
+        erp_submission_result: dict[str, Any] | None = None
+        if submit_to_erp:
+            erp_submission_result = await self._submit_adoption_to_erp(
+                task_id=task_id,
+                adoption=adoption,
+                decision_output=decision_output,
+            )
+            if erp_submission_result:
+                adoption["erp_submission"] = erp_submission_result
+                config["adoption"] = adoption
+                task.config = config
+                await self.session.commit()
+
         result = self._serialize_task(task)
         result["adoption"] = adoption
         result["message"] = "采纳推荐成功"
+        if erp_submission_result:
+            result["erp_submission"] = erp_submission_result
         return result
+
+    async def _submit_adoption_to_erp(
+        self,
+        *,
+        task_id: str,
+        adoption: dict[str, Any],
+        decision_output: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        from src.core.pms_governance import AuditContext
+        from src.models.enums import RecommendationCategory, RecommendationPriority
+        from src.services.suggestion_service import SuggestionService
+
+        try:
+            audit_ctx = AuditContext.from_actor(
+                self.actor,
+                tenant_id=str(self.tenant_id) if self.tenant_id else None,
+                purpose="adopt_recommendation",
+                trace_id=get_trace_id() or f"adopt-{task_id}",
+                idempotency_key=f"adopt:{task_id}",
+            )
+
+            suggestion_service = SuggestionService(
+                self.session,
+                tenant_id=str(self.tenant_id) if self.tenant_id else None,
+                actor=self.actor,
+            )
+
+            suggestion = await suggestion_service.create_suggestion(
+                category=RecommendationCategory.SELECTION,
+                target_domain="scm",
+                title=f"选品采纳-采购建议 (任务{task_id[:8]})",
+                description=adoption.get("notes") or f"选品任务{task_id}采纳推荐，建议提交采购",
+                priority=RecommendationPriority.HIGH,
+                score=adoption.get("recommended_price"),
+                payload={
+                    "task_id": task_id,
+                    "adoption": adoption,
+                    "decision_output": decision_output,
+                    "quantity": adoption.get("quantity"),
+                    "supplier_code": adoption.get("supplier_code"),
+                    "recommended_price": adoption.get("recommended_price"),
+                    "suggestion_type": "purchase_suggestion",
+                },
+                audit_context=audit_ctx,
+            )
+
+            await suggestion_service.score_suggestion(
+                suggestion["id"],
+                score=adoption.get("recommended_price") or 50.0,
+                audit_context=audit_ctx,
+            )
+
+            submit_result = await suggestion_service.submit_suggestion(
+                suggestion["id"],
+                audit_context=audit_ctx,
+            )
+
+            return {
+                "suggestion_id": suggestion["id"],
+                "suggestion_status": submit_result.get("suggestion_status"),
+                "target_domain": "scm",
+                "submitted_at": _now_iso(),
+            }
+        except Exception:
+            logger.exception("采纳推荐提交ERP建议池失败: task_id=%s", task_id)
+            return {"error": "erp_submission_failed", "task_id": task_id}
 
     async def reject_recommendation(
         self,

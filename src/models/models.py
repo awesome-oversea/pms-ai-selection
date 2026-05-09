@@ -49,7 +49,11 @@ from src.models.base import Base
 from src.models.enums import (
     AgentStatus,
     AgentType,
+    AIFeatureToggle,
     ERPSystemType,
+    RecommendationCategory,
+    RecommendationExecutionState,
+    RecommendationPriority,
     ReportType,
     TaskPriority,
     TaskStatus,
@@ -941,4 +945,361 @@ class AuditLog(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Index("ix_audit_tenant_action_time", "tenant_id", "action", "occurred_at"),
         Index("ix_audit_tenant_user_time", "tenant_id", "username", "occurred_at"),
         Index("ix_audit_tenant_target_time", "tenant_id", "target_type", "target_id", "occurred_at"),
+    )
+
+
+class Recommendation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """建议池表。PMS输出的所有建议统一存储。"""
+
+    __tablename__ = "recommendations"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True, comment="租户ID"
+    )
+    category: Mapped[RecommendationCategory] = mapped_column(
+        SAEnum(RecommendationCategory), nullable=False, index=True, comment="建议类别"
+    )
+    priority: Mapped[RecommendationPriority] = mapped_column(
+        SAEnum(RecommendationPriority), default=RecommendationPriority.MEDIUM, index=True, comment="建议优先级"
+    )
+    execution_state: Mapped[RecommendationExecutionState] = mapped_column(
+        SAEnum(RecommendationExecutionState), default=RecommendationExecutionState.SUGGESTED, index=True, comment="执行状态"
+    )
+    target_domain: Mapped[str] = mapped_column(
+        String(30), nullable=False, index=True, comment="目标ERP域"
+    )
+    title: Mapped[str] = mapped_column(
+        String(300), nullable=False, comment="建议标题"
+    )
+    description: Mapped[str | None] = mapped_column(Text, comment="建议描述")
+    score: Mapped[float | None] = mapped_column(Float, comment="AI评分(0-100)")
+    confidence: Mapped[float | None] = mapped_column(Float, comment="置信度(0-1)")
+    evidence_chain: Mapped[dict | None] = mapped_column(
+        JSONB, comment="证据链JSON"
+    )
+    data_sources: Mapped[list | None] = mapped_column(
+        JSONB, comment="数据源列表JSON"
+    )
+    risk_flags: Mapped[list | None] = mapped_column(
+        JSONB, comment="风险标识列表JSON"
+    )
+    payload: Mapped[dict | None] = mapped_column(
+        JSONB, comment="建议载荷JSON(域特定数据)"
+    )
+    source_task_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("selection_tasks.id"), index=True, comment="来源选品任务ID"
+    )
+    source_product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id"), index=True, comment="关联产品ID"
+    )
+    erp_ref_id: Mapped[str | None] = mapped_column(
+        String(100), comment="ERP侧引用ID(草稿/建议池ID)"
+    )
+    rejection_reason: Mapped[str | None] = mapped_column(Text, comment="拒绝原因")
+    feedback: Mapped[dict | None] = mapped_column(
+        JSONB, comment="执行反馈JSON"
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), comment="创建者"
+    )
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), comment="提交ERP时间")
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), comment="ERP执行时间")
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), comment="关闭时间")
+
+    __table_args__ = (
+        Index("ix_rec_tenant_category_state", "tenant_id", "category", "execution_state"),
+        Index("ix_rec_tenant_domain_state", "tenant_id", "target_domain", "execution_state"),
+        Index("ix_rec_tenant_priority_created", "tenant_id", "priority", "created_at"),
+    )
+
+
+class AIFeatureConfig(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """AI功能开关配置表。按租户+域控制AI增强功能。"""
+
+    __tablename__ = "ai_feature_configs"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True, comment="租户ID"
+    )
+    feature_key: Mapped[AIFeatureToggle] = mapped_column(
+        SAEnum(AIFeatureToggle), nullable=False, index=True, comment="功能开关键"
+    )
+    is_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, comment="是否启用"
+    )
+    rollout_percentage: Mapped[int | None] = mapped_column(
+        Integer, comment="灰度发布百分比(0-100)"
+    )
+    config: Mapped[dict | None] = mapped_column(
+        JSONB, comment="功能配置参数JSON"
+    )
+    config_overrides: Mapped[dict | None] = mapped_column(
+        JSONB, comment="配置覆盖JSON(租户级)"
+    )
+    description: Mapped[str | None] = mapped_column(Text, comment="功能说明")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), comment="创建者"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "feature_key", name="uq_tenant_feature_key"),
+    )
+
+
+class AdOptimizationSuggestion(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """广告优化建议表。"""
+
+    __tablename__ = "ad_optimization_suggestions"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True, comment="租户ID"
+    )
+    recommendation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recommendations.id"), index=True, comment="关联建议ID"
+    )
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id"), index=True, comment="关联产品ID"
+    )
+    suggestion_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True, comment="建议类型(bid_adjustment/keyword_suggestion/budget_allocation/campaign_optimization)"
+    )
+    current_metrics: Mapped[dict | None] = mapped_column(
+        JSONB, comment="当前广告指标JSON(acos/roas/ctr/cpc/impressions/clicks)"
+    )
+    suggested_changes: Mapped[dict | None] = mapped_column(
+        JSONB, comment="建议变更JSON"
+    )
+    expected_impact: Mapped[dict | None] = mapped_column(
+        JSONB, comment="预期影响JSON"
+    )
+    confidence: Mapped[float | None] = mapped_column(Float, comment="置信度(0-1)")
+    status: Mapped[str] = mapped_column(
+        String(20), default="suggested", index=True, comment="状态(suggested/submitted/approved/rejected/executed)"
+    )
+    campaign_id: Mapped[str | None] = mapped_column(String(100), comment="广告活动ID")
+    ad_group_id: Mapped[str | None] = mapped_column(String(100), comment="广告组ID")
+    marketplace: Mapped[str | None] = mapped_column(String(20), comment="市场平台")
+
+    __table_args__ = (
+        Index("ix_ad_opt_tenant_type_status", "tenant_id", "suggestion_type", "status"),
+    )
+
+
+class FBARestockSuggestion(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """FBA补货建议表。"""
+
+    __tablename__ = "fba_restock_suggestions"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True, comment="租户ID"
+    )
+    recommendation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recommendations.id"), index=True, comment="关联建议ID"
+    )
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id"), index=True, comment="关联产品ID"
+    )
+    sku: Mapped[str | None] = mapped_column(String(100), index=True, comment="SKU编码")
+    fnsku: Mapped[str | None] = mapped_column(String(100), comment="FNSKU编码")
+    asin: Mapped[str | None] = mapped_column(String(20), comment="ASIN")
+    current_stock: Mapped[int | None] = mapped_column(Integer, comment="当前库存")
+    inbound_quantity: Mapped[int | None] = mapped_column(Integer, comment="在途数量")
+    daily_velocity: Mapped[float | None] = mapped_column(Float, comment="日均销量")
+    days_of_supply: Mapped[float | None] = mapped_column(Float, comment="可供货天数")
+    suggested_quantity: Mapped[int | None] = mapped_column(Integer, comment="建议补货数量")
+    urgency: Mapped[str] = mapped_column(
+        String(20), default="normal", index=True, comment="紧急程度(critical/high/normal/low)"
+    )
+    lead_time_days: Mapped[int | None] = mapped_column(Integer, comment="采购提前期(天)")
+    safety_stock: Mapped[int | None] = mapped_column(Integer, comment="安全库存")
+    marketplace: Mapped[str | None] = mapped_column(String(20), comment="市场平台")
+    status: Mapped[str] = mapped_column(
+        String(20), default="suggested", index=True, comment="状态"
+    )
+    confidence: Mapped[float | None] = mapped_column(Float, comment="置信度(0-1)")
+
+    __table_args__ = (
+        Index("ix_fba_restock_tenant_urgency", "tenant_id", "urgency", "status"),
+    )
+
+
+class RiskAssessment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """风控评分表。"""
+
+    __tablename__ = "risk_assessments"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True, comment="租户ID"
+    )
+    recommendation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recommendations.id"), index=True, comment="关联建议ID"
+    )
+    risk_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True, comment="风险类型(order_risk/supply_risk/inventory_risk/compliance_risk/pricing_risk)"
+    )
+    target_domain: Mapped[str] = mapped_column(
+        String(30), nullable=False, index=True, comment="目标ERP域"
+    )
+    target_id: Mapped[str | None] = mapped_column(String(100), index=True, comment="目标对象ID")
+    risk_score: Mapped[float] = mapped_column(Float, comment="风险评分(0-100)")
+    risk_level: Mapped[str] = mapped_column(
+        String(20), nullable=False, index=True, comment="风险等级(low/medium/high/critical)"
+    )
+    risk_factors: Mapped[list | None] = mapped_column(
+        JSONB, comment="风险因子列表JSON"
+    )
+    mitigation_suggestions: Mapped[list | None] = mapped_column(
+        JSONB, comment="缓解建议列表JSON"
+    )
+    evidence: Mapped[dict | None] = mapped_column(
+        JSONB, comment="证据数据JSON"
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", index=True, comment="状态(active/acknowledged/mitigated/expired)"
+    )
+
+    __table_args__ = (
+        Index("ix_risk_tenant_type_level", "tenant_id", "risk_type", "risk_level"),
+    )
+
+
+class PricingSuggestion(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """定价建议表。"""
+
+    __tablename__ = "pricing_suggestions"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True, comment="租户ID"
+    )
+    recommendation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recommendations.id"), index=True, comment="关联建议ID"
+    )
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id"), index=True, comment="关联产品ID"
+    )
+    suggestion_type: Mapped[str] = mapped_column(
+        String(50), default="new_product_pricing", index=True, comment="建议类型(new_product_pricing/price_adjustment/promotional_pricing)"
+    )
+    current_price: Mapped[float | None] = mapped_column(Float, comment="当前价格")
+    suggested_price: Mapped[float | None] = mapped_column(Float, comment="建议价格")
+    cost_price: Mapped[float | None] = mapped_column(Float, comment="成本价格")
+    min_price: Mapped[float | None] = mapped_column(Float, comment="最低价格")
+    max_price: Mapped[float | None] = mapped_column(Float, comment="最高价格")
+    target_margin: Mapped[float | None] = mapped_column(Float, comment="目标利润率")
+    pricing_strategy: Mapped[str] = mapped_column(
+        String(50), default="margin_optimized", comment="定价策略(competitive/skim/penetration/dynamic/margin_optimized)"
+    )
+    competitor_avg_price: Mapped[float | None] = mapped_column(Float, comment="竞品均价")
+    estimated_margin: Mapped[float | None] = mapped_column(Float, comment="预估利润率")
+    expected_demand_change: Mapped[float | None] = mapped_column(Float, comment="预期需求变化率")
+    margin_analysis: Mapped[dict | None] = mapped_column(JSONB, comment="利润分析JSON")
+    competitor_analysis: Mapped[dict | None] = mapped_column(JSONB, comment="竞品分析JSON")
+    price_impact_estimate: Mapped[dict | None] = mapped_column(JSONB, comment="价格影响预估JSON")
+    confidence: Mapped[float | None] = mapped_column(Float, comment="置信度(0-1)")
+    marketplace: Mapped[str | None] = mapped_column(String(20), comment="市场平台")
+    status: Mapped[str] = mapped_column(
+        String(20), default="suggested", index=True, comment="状态"
+    )
+    reasoning: Mapped[str | None] = mapped_column(Text, comment="定价理由")
+
+    __table_args__ = (
+        Index("ix_pricing_tenant_strategy_status", "tenant_id", "pricing_strategy", "status"),
+    )
+
+
+class InventoryPrediction(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """库存预测表。"""
+
+    __tablename__ = "inventory_predictions"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True, comment="租户ID"
+    )
+    recommendation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recommendations.id"), index=True, comment="关联建议ID"
+    )
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id"), index=True, comment="关联产品ID"
+    )
+    sku: Mapped[str | None] = mapped_column(String(100), index=True, comment="SKU编码")
+    warehouse_code: Mapped[str | None] = mapped_column(String(50), comment="仓库编码")
+    current_stock: Mapped[int | None] = mapped_column(Integer, comment="当前库存")
+    prediction_horizon_days: Mapped[int] = mapped_column(
+        Integer, default=30, comment="预测周期(天)"
+    )
+    predicted_demand_short: Mapped[float | None] = mapped_column(Float, comment="7天预测需求")
+    predicted_demand_medium: Mapped[float | None] = mapped_column(Float, comment="30天预测需求")
+    predicted_demand_long: Mapped[float | None] = mapped_column(Float, comment="90天预测需求")
+    predicted_demand_7d: Mapped[float | None] = mapped_column(Float, comment="7天预测需求(兼容)")
+    predicted_demand_14d: Mapped[float | None] = mapped_column(Float, comment="14天预测需求(兼容)")
+    predicted_demand_30d: Mapped[float | None] = mapped_column(Float, comment="30天预测需求(兼容)")
+    stockout_probability: Mapped[float | None] = mapped_column(Float, comment="缺货概率(0-1)")
+    overstock_probability: Mapped[float | None] = mapped_column(Float, comment="滞销概率(0-1)")
+    stockout_risk_score: Mapped[float | None] = mapped_column(Float, comment="断货风险评分(0-100)")
+    stockout_risk_level: Mapped[str | None] = mapped_column(String(20), comment="断货风险等级(low/medium/high/critical)")
+    reorder_point: Mapped[int | None] = mapped_column(Integer, comment="补货点")
+    optimal_order_quantity: Mapped[int | None] = mapped_column(Integer, comment="最优订货量")
+    suggested_reorder_quantity: Mapped[int | None] = mapped_column(Integer, comment="建议补货数量(兼容)")
+    suggested_reorder_date: Mapped[str | None] = mapped_column(String(20), comment="建议补货日期")
+    input_features: Mapped[dict | None] = mapped_column(JSONB, comment="输入特征JSON")
+    model_version: Mapped[str | None] = mapped_column(String(50), comment="模型版本")
+    confidence: Mapped[float | None] = mapped_column(Float, comment="置信度(0-1)")
+    marketplace: Mapped[str | None] = mapped_column(String(20), comment="市场平台")
+
+    __table_args__ = (
+        Index("ix_inv_pred_tenant_sku", "tenant_id", "sku"),
+    )
+
+
+class SentimentAnalysis(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """情感分析表。"""
+
+    __tablename__ = "sentiment_analyses"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True, comment="租户ID"
+    )
+    recommendation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recommendations.id"), index=True, comment="关联建议ID"
+    )
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id"), index=True, comment="关联产品ID"
+    )
+    source_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True, comment="来源类型(review/qna/social_media/customer_service)"
+    )
+    source_id: Mapped[str | None] = mapped_column(String(100), comment="来源ID")
+    total_reviews: Mapped[int | None] = mapped_column(Integer, comment="评论总数")
+    sentiment_score: Mapped[float] = mapped_column(Float, comment="情感评分(-1到1)")
+    sentiment_label: Mapped[str] = mapped_column(
+        String(20), nullable=False, index=True, comment="情感标签(positive/neutral/negative/mixed)"
+    )
+    sentiment_distribution: Mapped[dict | None] = mapped_column(
+        JSONB, comment="情感分布JSON"
+    )
+    top_keywords: Mapped[list | None] = mapped_column(
+        JSONB, comment="关键词列表JSON"
+    )
+    key_topics: Mapped[list | None] = mapped_column(
+        JSONB, comment="关键话题列表JSON(兼容)"
+    )
+    negative_review_ratio: Mapped[float | None] = mapped_column(Float, comment="负面评论比例")
+    sentiment_trend: Mapped[str | None] = mapped_column(String(20), comment="情感趋势(improving/stable/declining)")
+    pain_points: Mapped[list | None] = mapped_column(
+        JSONB, comment="痛点列表JSON"
+    )
+    improvement_suggestions: Mapped[list | None] = mapped_column(
+        JSONB, comment="改进建议列表JSON"
+    )
+    sample_texts: Mapped[list | None] = mapped_column(
+        JSONB, comment="代表性文本列表JSON"
+    )
+    analysis_metadata: Mapped[dict | None] = mapped_column(
+        JSONB, comment="分析元数据JSON"
+    )
+    marketplace: Mapped[str | None] = mapped_column(String(20), comment="市场平台")
+    analysis_period: Mapped[str | None] = mapped_column(String(30), comment="分析周期")
+
+    __table_args__ = (
+        Index("ix_sentiment_tenant_source_label", "tenant_id", "source_type", "sentiment_label"),
     )

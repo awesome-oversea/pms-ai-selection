@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI选品系统 - 广告优化</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+        .form-group { margin-bottom:1rem; }
+        .form-group label { display:block; font-weight:500; margin-bottom:0.3rem; font-size:0.875rem; color:var(--gray-700); }
+        .form-group input, .form-group select, .form-group textarea { width:100%; padding:0.5rem 0.75rem; border:1px solid var(--gray-300); border-radius:6px; font-size:0.875rem; }
+        .form-group textarea { resize:vertical; min-height:80px; }
+        .btn { padding:0.5rem 1.25rem; border:none; border-radius:6px; cursor:pointer; font-size:0.875rem; transition:all 0.2s; }
+        .btn-primary { background:var(--primary); color:#fff; }
+        .btn-primary:hover { background:var(--primary-dark); }
+        .btn-outline { background:transparent; border:1px solid var(--gray-300); color:var(--gray-700); }
+        .btn-success { background:var(--success); color:#fff; }
+        .btn-danger { background:var(--danger); color:#fff; }
+        .btn-sm { padding:0.3rem 0.6rem; font-size:0.8rem; }
+        .card { background:#fff; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.08); padding:1.5rem; margin-bottom:1.5rem; }
+        .card h3 { margin-bottom:1rem; font-size:1.1rem; }
+        .tabs { display:flex; gap:0; border-bottom:2px solid var(--gray-200); margin-bottom:1.5rem; }
+        .tab { padding:0.75rem 1.5rem; cursor:pointer; font-weight:500; color:var(--gray-500); border-bottom:2px solid transparent; margin-bottom:-2px; transition:all 0.2s; }
+        .tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+        .tab:hover { color:var(--primary); }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+        .result-card { background:var(--gray-50); border-radius:8px; padding:1rem; margin-top:1rem; }
+        .result-card h4 { margin-bottom:0.5rem; font-size:0.95rem; }
+        .metric-row { display:flex; gap:1rem; flex-wrap:wrap; margin:0.5rem 0; }
+        .metric-item { background:#fff; padding:0.75rem 1rem; border-radius:6px; border-left:3px solid var(--primary); flex:1; min-width:120px; }
+        .metric-value { font-size:1.25rem; font-weight:700; }
+        .metric-label { font-size:0.75rem; color:var(--gray-500); }
+        .suggestion-list { margin-top:1rem; }
+        .suggestion-item { background:#fff; border:1px solid var(--gray-200); border-radius:8px; padding:1rem; margin-bottom:0.75rem; }
+        .suggestion-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; }
+        .badge { display:inline-block; padding:0.2rem 0.6rem; border-radius:9999px; font-size:0.75rem; font-weight:600; }
+        .badge-suggested { background:#e0e7ff; color:#3730a3; }
+        .badge-submitted { background:#fef3c7; color:#92400e; }
+        .badge-executed { background:#d1fae5; color:#065f46; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🎯 AI选品系统</div>
+        <div class="nav-links">
+            <a href="/">仪表盘</a>
+            <a href="/selection">选品任务</a>
+            <a href="/approval">审批管理</a>
+            <a href="/recommendations">建议池</a>
+            <a href="/ads-optimization" class="active">广告优化</a>
+            <a href="/fba-restock">FBA补货</a>
+            <a href="/ai-insights">AI洞察</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>📢 广告优化</h1>
+            <p class="subtitle">AI驱动的广告竞价调整、关键词优化和预算分配建议</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('bid')">竞价调整</div>
+            <div class="tab" onclick="switchTab('keyword')">关键词优化</div>
+            <div class="tab" onclick="switchTab('budget')">预算分配</div>
+        </div>
+
+        <div class="tab-content active" id="tab-bid">
+            <div class="card">
+                <h3>📊 竞价调整建议</h3>
+                <form id="bidForm" onsubmit="handleBidAdjustment(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>产品ID *</label>
+                            <input type="text" id="bidProductId" required placeholder="输入产品UUID">
+                        </div>
+                        <div class="form-group">
+                            <label>广告活动ID *</label>
+                            <input type="text" id="bidCampaignId" required placeholder="输入广告活动ID">
+                        </div>
+                        <div class="form-group">
+                            <label>市场平台</label>
+                            <select id="bidMarketplace">
+                                <option value="amazon_us">Amazon US</option>
+                                <option value="amazon_eu">Amazon EU</option>
+                                <option value="amazon_jp">Amazon JP</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>建议竞价</label>
+                            <input type="number" id="bidSuggestedBid" step="0.01" min="0" placeholder="留空由AI计算">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>当前广告指标 (JSON)</label>
+                        <textarea id="bidMetrics" placeholder='{"acos":0.35,"roas":2.86,"ctr":0.025,"cpc":0.85,"impressions":10000,"clicks":250}'>{"acos":0.35,"roas":2.86,"ctr":0.025,"cpc":0.85}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">生成竞价建议</button>
+                </form>
+                <div id="bidResult"></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-keyword">
+            <div class="card">
+                <h3>🔑 关键词优化建议</h3>
+                <form id="keywordForm" onsubmit="handleKeywordSuggestion(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>产品ID *</label>
+                            <input type="text" id="kwProductId" required placeholder="输入产品UUID">
+                        </div>
+                        <div class="form-group">
+                            <label>广告活动ID *</label>
+                            <input type="text" id="kwCampaignId" required placeholder="输入广告活动ID">
+                        </div>
+                        <div class="form-group">
+                            <label>市场平台</label>
+                            <select id="kwMarketplace">
+                                <option value="amazon_us">Amazon US</option>
+                                <option value="amazon_eu">Amazon EU</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>当前关键词</label>
+                            <input type="text" id="kwCurrentKeywords" placeholder="逗号分隔，如: phone case,cover">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">生成关键词建议</button>
+                </form>
+                <div id="keywordResult"></div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-budget">
+            <div class="card">
+                <h3>💰 预算分配建议</h3>
+                <form id="budgetForm" onsubmit="handleBudgetAllocation(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>产品ID *</label>
+                            <input type="text" id="budgetProductId" required placeholder="输入产品UUID">
+                        </div>
+                        <div class="form-group">
+                            <label>广告活动ID *</label>
+                            <input type="text" id="budgetCampaignId" required placeholder="输入广告活动ID">
+                        </div>
+                        <div class="form-group">
+                            <label>当前日预算</label>
+                            <input type="number" id="budgetCurrentBudget" step="0.01" min="0" placeholder="当前日预算">
+                        </div>
+                        <div class="form-group">
+                            <label>市场平台</label>
+                            <select id="budgetMarketplace">
+                                <option value="amazon_us">Amazon US</option>
+                                <option value="amazon_eu">Amazon EU</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">生成预算建议</button>
+                </form>
+                <div id="budgetResult"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📜 历史建议</h3>
+            <div id="historyList" class="suggestion-list">
+                <div style="text-align:center;padding:2rem;color:var(--gray-500);">暂无历史建议</div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/erp_domains_api.js"></script>
+    <script>
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + name).classList.add('active');
+        }
+
+        async function handleBidAdjustment(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = '生成中...';
+            try {
+                let metrics = {};
+                try { metrics = JSON.parse(document.getElementById('bidMetrics').value || '{}'); } catch {}
+                const result = await ErpDomainsAPI.generateBidAdjustment({
+                    product_id: document.getElementById('bidProductId').value,
+                    campaign_id: document.getElementById('bidCampaignId').value,
+                    marketplace: document.getElementById('bidMarketplace').value,
+                    suggested_bid: parseFloat(document.getElementById('bidSuggestedBid').value) || undefined,
+                    current_metrics: metrics,
+                });
+                renderBidResult(result);
+                showToast('竞价建议已生成', 'success');
+            } catch (err) {
+                document.getElementById('bidResult').innerHTML = `<div class="result-card" style="color:var(--danger)">生成失败: ${escapeHtml(err.message)}</div>`;
+            } finally {
+                btn.disabled = false; btn.textContent = '生成竞价建议';
+            }
+        }
+
+        function renderBidResult(r) {
+            document.getElementById('bidResult').innerHTML = `
+                <div class="result-card">
+                    <h4>✅ 竞价调整建议</h4>
+                    <div class="metric-row">
+                        <div class="metric-item"><div class="metric-value">${r.suggested_bid != null ? '$' + r.suggested_bid.toFixed(2) : '-'}</div><div class="metric-label">建议竞价</div></div>
+                        <div class="metric-item"><div class="metric-value">${r.confidence != null ? (r.confidence * 100).toFixed(1) + '%' : '-'}</div><div class="metric-label">置信度</div></div>
+                        <div class="metric-item"><div class="metric-value">${r.suggestion_type || 'bid_adjustment'}</div><div class="metric-label">建议类型</div></div>
+                    </div>
+                    ${r.suggested_changes ? `<div style="margin-top:0.75rem;"><strong>建议变更:</strong><pre style="font-size:0.8rem;background:#fff;padding:0.75rem;border-radius:6px;overflow-x:auto;">${escapeHtml(JSON.stringify(r.suggested_changes, null, 2))}</pre></div>` : ''}
+                    ${r.expected_impact ? `<div style="margin-top:0.5rem;"><strong>预期影响:</strong><pre style="font-size:0.8rem;background:#fff;padding:0.75rem;border-radius:6px;overflow-x:auto;">${escapeHtml(JSON.stringify(r.expected_impact, null, 2))}</pre></div>` : ''}
+                </div>`;
+        }
+
+        async function handleKeywordSuggestion(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = '生成中...';
+            try {
+                const result = await ErpDomainsAPI.generateKeywordSuggestion({
+                    product_id: document.getElementById('kwProductId').value,
+                    campaign_id: document.getElementById('kwCampaignId').value,
+                    marketplace: document.getElementById('kwMarketplace').value,
+                    current_keywords: document.getElementById('kwCurrentKeywords').value.split(',').map(s => s.trim()).filter(Boolean),
+                });
+                document.getElementById('keywordResult').innerHTML = `
+                    <div class="result-card">
+                        <h4>✅ 关键词优化建议</h4>
+                        <div class="metric-row">
+                            <div class="metric-item"><div class="metric-value">${result.confidence != null ? (result.confidence * 100).toFixed(1) + '%' : '-'}</div><div class="metric-label">置信度</div></div>
+                        </div>
+                        ${result.suggested_changes ? `<div style="margin-top:0.75rem;"><strong>建议变更:</strong><pre style="font-size:0.8rem;background:#fff;padding:0.75rem;border-radius:6px;overflow-x:auto;">${escapeHtml(JSON.stringify(result.suggested_changes, null, 2))}</pre></div>` : ''}
+                    </div>`;
+                showToast('关键词建议已生成', 'success');
+            } catch (err) {
+                document.getElementById('keywordResult').innerHTML = `<div class="result-card" style="color:var(--danger)">生成失败: ${escapeHtml(err.message)}</div>`;
+            } finally {
+                btn.disabled = false; btn.textContent = '生成关键词建议';
+            }
+        }
+
+        async function handleBudgetAllocation(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = '生成中...';
+            try {
+                const result = await ErpDomainsAPI.generateBudgetAllocation({
+                    product_id: document.getElementById('budgetProductId').value,
+                    campaign_id: document.getElementById('budgetCampaignId').value,
+                    marketplace: document.getElementById('budgetMarketplace').value,
+                    current_budget: parseFloat(document.getElementById('budgetCurrentBudget').value) || undefined,
+                });
+                document.getElementById('budgetResult').innerHTML = `
+                    <div class="result-card">
+                        <h4>✅ 预算分配建议</h4>
+                        <div class="metric-row">
+                            <div class="metric-item"><div class="metric-value">${result.confidence != null ? (result.confidence * 100).toFixed(1) + '%' : '-'}</div><div class="metric-label">置信度</div></div>
+                        </div>
+                        ${result.suggested_changes ? `<div style="margin-top:0.75rem;"><strong>建议变更:</strong><pre style="font-size:0.8rem;background:#fff;padding:0.75rem;border-radius:6px;overflow-x:auto;">${escapeHtml(JSON.stringify(result.suggested_changes, null, 2))}</pre></div>` : ''}
+                    </div>`;
+                showToast('预算建议已生成', 'success');
+            } catch (err) {
+                document.getElementById('budgetResult').innerHTML = `<div class="result-card" style="color:var(--danger)">生成失败: ${escapeHtml(err.message)}</div>`;
+            } finally {
+                btn.disabled = false; btn.textContent = '生成预算建议';
+            }
+        }
+    </script>
+</body>
+</html>

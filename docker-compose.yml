@@ -5,7 +5,7 @@ services:
     command: ["postgres", "-c", "wal_level=logical", "-c", "max_wal_senders=10", "-c", "max_replication_slots=10"]
     environment:
       POSTGRES_USER: pms
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pms_dev_2024}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME}
       POSTGRES_DB: pms_db
     ports:
       - "${POSTGRES_HOST_PORT:-5432}:5432"
@@ -74,7 +74,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-true}
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-DEBUG}
       APP_API_PREFIX: ${APP_API_PREFIX:-/api/v1}
-      DB_URL: postgresql+asyncpg://pms:${POSTGRES_PASSWORD:-pms_dev_2024}@postgres:5432/pms_db
+      DB_URL: postgresql+asyncpg://pms:${POSTGRES_PASSWORD:-CHANGE_ME}@postgres:5432/pms_db
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       QDRANT_HOST: qdrant

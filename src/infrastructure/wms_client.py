@@ -96,6 +96,7 @@ class WMSClient:
         enriched.setdefault("scope", audit_context.scope)
         enriched.setdefault("purpose", audit_context.purpose)
         enriched.setdefault("trace_id", audit_context.trace_id)
+        enriched.setdefault("source_system", audit_context.source_system)
         if audit_context.idempotency_key:
             enriched.setdefault("idempotency_key", audit_context.idempotency_key)
         return enriched
@@ -132,6 +133,57 @@ class WMSClient:
             status = e.response.status_code
             if status in {401, 403}:
                 raise WMSClientError(str(e), error_code="auth_failed", retryable=False)
+            if status >= 500:
+                raise WMSClientError(str(e), error_code="upstream_5xx", retryable=True)
+            raise WMSClientError(str(e), error_code="upstream_4xx", retryable=False)
+        except Exception as e:
+            raise WMSClientError(str(e), error_code="transport_error", retryable=True)
+
+    async def query_suggestion_status(
+        self,
+        suggestion_id: str,
+        audit_context: AuditContext | None = None,
+    ) -> dict[str, Any]:
+        try:
+            audit = self._resolve_audit_context(
+                audit_context,
+                purpose="query_suggestion_status",
+                idempotency_key=f"wms-status-{suggestion_id}",
+            )
+            if is_local_artifact_endpoint(self.api_endpoint):
+                artifact = read_json_artifact(self.api_endpoint, self.inbound_path)
+                items = artifact if isinstance(artifact, list) else [artifact] if isinstance(artifact, dict) else []
+                for item in items:
+                    if isinstance(item, dict) and (item.get("suggestion_id") == suggestion_id or item.get("reservation_id") == suggestion_id):
+                        return {
+                            "suggestion_id": suggestion_id,
+                            "domain": "wms",
+                            "status": item.get("status", "unknown"),
+                            "detail": item.get("detail"),
+                            "updated_at": item.get("updated_at"),
+                            "reservation_id": item.get("reservation_id"),
+                        }
+                return {"suggestion_id": suggestion_id, "domain": "wms", "status": "not_found"}
+            body = await self._transport().request(
+                "GET",
+                f"suggestions/{suggestion_id}/status",
+                audit_context=audit,
+            )
+            if isinstance(body, dict):
+                body.setdefault("domain", "wms")
+                body.setdefault("suggestion_id", suggestion_id)
+                return body
+            return {"suggestion_id": suggestion_id, "domain": "wms", "status": "unknown"}
+        except FileNotFoundError:
+            return {"suggestion_id": suggestion_id, "domain": "wms", "status": "not_found"}
+        except ERPClientError as e:
+            self._raise_client_error(e)
+        except httpx.TimeoutException as e:
+            raise WMSClientError(str(e), error_code="timeout", retryable=True)
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            if status == 404:
+                return {"suggestion_id": suggestion_id, "domain": "wms", "status": "not_found"}
             if status >= 500:
                 raise WMSClientError(str(e), error_code="upstream_5xx", retryable=True)
             raise WMSClientError(str(e), error_code="upstream_4xx", retryable=False)

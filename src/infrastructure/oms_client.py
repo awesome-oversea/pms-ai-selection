@@ -113,3 +113,24 @@ class OMSClient:
             error_code="boundary_violation",
             retryable=False,
         )
+
+    async def query_order_status(self, order_id: str) -> dict[str, Any]:
+        try:
+            if is_local_artifact_endpoint(self.api_endpoint):
+                artifact = read_json_artifact(self.api_endpoint, self.inbound_path)
+                items = artifact if isinstance(artifact, list) else [artifact] if isinstance(artifact, dict) else []
+                for item in items:
+                    if isinstance(item, dict) and (item.get("order_id") == order_id or item.get("id") == order_id):
+                        return {
+                            "order_id": order_id,
+                            "domain": "oms",
+                            "status": item.get("status", "unknown"),
+                            "detail": item.get("detail"),
+                            "updated_at": item.get("updated_at"),
+                        }
+                return {"order_id": order_id, "domain": "oms", "status": "not_found"}
+            return {"order_id": order_id, "domain": "oms", "status": "not_available", "note": "remote OMS status query not yet configured"}
+        except FileNotFoundError:
+            return {"order_id": order_id, "domain": "oms", "status": "not_found"}
+        except Exception as e:
+            raise OMSClientError(str(e), error_code="transport_error", retryable=True)
